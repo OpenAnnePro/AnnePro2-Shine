@@ -37,8 +37,8 @@
 #define LINE_LED_PWR                                       PAL_LINE(IOPORTB, 15)
 
 // PORTA 12,13 conflict SWD
-#define LINE_LED_COL_1                                     PAL_LINE(IOPORTD, 12)
-#define LINE_LED_COL_2                                     PAL_LINE(IOPORTD, 13)
+#define LINE_LED_COL_1                                     PAL_LINE(IOPORTA, 12)
+#define LINE_LED_COL_2                                     PAL_LINE(IOPORTA, 13)
 #define LINE_LED_COL_3                                     PAL_LINE(IOPORTA, 14)
 #define LINE_LED_COL_4                                     PAL_LINE(IOPORTA, 15)
 #define LINE_LED_COL_5                                     PAL_LINE(IOPORTB,  5)
@@ -54,7 +54,7 @@
 
 #define LINE_LED_ROW_1_R                                   PAL_LINE(IOPORTB,  0)
 #define LINE_LED_ROW_1_G                                   PAL_LINE(IOPORTC,  0)
-#define LINE_LED_ROW_1_B                                   PAL_LINE(IOPORTB,  5)
+#define LINE_LED_ROW_1_B                                   PAL_LINE(IOPORTB,  4)
 #define LINE_LED_ROW_2_R                                   PAL_LINE(IOPORTB,  1)
 #define LINE_LED_ROW_2_G                                   PAL_LINE(IOPORTA,  8)
 #define LINE_LED_ROW_2_B                                   PAL_LINE(IOPORTA,  6)

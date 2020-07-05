@@ -21,6 +21,7 @@
 
 static void columnCallback(GPTDriver* driver);
 
+
 ioline_t ledColumns[NUM_COLUMN] = {
   LINE_LED_COL_1, 
   LINE_LED_COL_2, 
@@ -36,6 +37,24 @@ ioline_t ledColumns[NUM_COLUMN] = {
   LINE_LED_COL_12,
   LINE_LED_COL_13,
   LINE_LED_COL_14
+};
+
+ioline_t ledRows[NUM_ROW * 3] = {
+  LINE_LED_ROW_1_R,
+  LINE_LED_ROW_1_G,
+  LINE_LED_ROW_1_B,
+  LINE_LED_ROW_2_R,
+  LINE_LED_ROW_2_G,
+  LINE_LED_ROW_2_B,
+  LINE_LED_ROW_3_R,
+  LINE_LED_ROW_3_G,
+  LINE_LED_ROW_3_B,
+  LINE_LED_ROW_4_R,
+  LINE_LED_ROW_4_G,
+  LINE_LED_ROW_4_B,
+  LINE_LED_ROW_5_R,
+  LINE_LED_ROW_5_G,
+  LINE_LED_ROW_5_B,
 };
 
 /*
@@ -58,25 +77,62 @@ THD_FUNCTION(Thread1, arg) {
   }
 }
 
-#define REFRESH_FREQUENCY           100
+#define REFRESH_FREQUENCY           160
+
+uint16_t ledColors[NUM_COLUMN * NUM_ROW] = {
+  0xF00,0, 0x0F0,0, 0x00F, 0,0,0,0,0,0,0,0,0,
+  0xF00,0, 0x0F0,0, 0x00F, 0,0,0,0,0,0,0,0,0,
+  0xF00,0, 0x0F0,0, 0x00F, 0,0,0,0,0,0,0,0,0,
+  0xF00,0, 0x0F0,0, 0x00F, 0,0,0,0,0,0,0,0,0,
+  0xF00,0, 0x0F0,0, 0x00F, 0,0,0,0,0,0,0,0,0,
+};
+static uint32_t currentColumn = 0;
+static uint32_t columnPWMCount = 0;
 
 // BFTM0 Configuration, this runs at 15 * REFRESH_FREQUENCY Hz
-const GPTConfig bftm0Config = {
-  .frequency = NUM_COLUMN * REFRESH_FREQUENCY * 10,
+static const GPTConfig bftm0Config = {
+  .frequency = NUM_COLUMN * REFRESH_FREQUENCY * 2 * 16,
   .callback = columnCallback
 };
 
-void columnCallback(GPTDriver* driver)
+void columnCallback(GPTDriver* _driver)
 {
-  static size_t currentColumn = 0;
-
-  (void)driver;
-  palClearLine(ledColumns[currentColumn]);
-  if (currentColumn < NUM_COLUMN)
-    currentColumn++;
-  else
-    currentColumn = 0;
-  palSetLine(ledColumns[currentColumn]);
+  (void)_driver;
+  if (columnPWMCount < 16)
+  {
+    for (size_t row = 0; row < NUM_ROW; row++)
+    {
+    const uint16_t row_color = ledColors[currentColumn + (NUM_COLUMN * row)];
+    // R
+    if (((row_color >> 8) & 0xF) > columnPWMCount)
+      palSetLine(ledRows[row * 3]);
+    else if (((row_color >> 8) & 0xF) <= columnPWMCount)
+      palClearLine(ledRows[row * 3]);
+    // G
+    if (((row_color >> 4) & 0xF) > columnPWMCount)
+      palSetLine(ledRows[row * 3 + 1]);
+    else if (((row_color >> 4) & 0xF) <= columnPWMCount)
+      palClearLine(ledRows[row * 3 + 1]);
+    // B
+    if (((row_color >> 0) & 0xF) > columnPWMCount)
+      palSetLine(ledRows[row * 3 + 2]);
+    else if (((row_color >> 0) & 0xF) <= columnPWMCount)
+      palClearLine(ledRows[row * 3 + 2]);
+    }
+  }
+  if (columnPWMCount == 15) {
+    palClearLine(ledColumns[currentColumn]);
+  }
+  if (columnPWMCount > 16)
+  {
+    palClearLine(ledColumns[currentColumn]);
+    if (++currentColumn >= NUM_COLUMN)
+      currentColumn = 0;
+    palSetLine(ledColumns[currentColumn]);
+    columnPWMCount = 0;
+  } else {
+    columnPWMCount++;
+  }
 }
 
 /*
@@ -94,12 +150,11 @@ int main(void) {
   chSysInit();
 
   // Powerup LED
-  // palSetLine(LINE_LED_PWR);
-  // palSetLine(LINE_LED_ROW_1_G);
+  palSetLine(LINE_LED_PWR);
 
   // Setup Column Multiplex Timer
   gptStart(&GPTD_BFTM0, &bftm0Config);
-  gptStartContinuous(&GPTD_BFTM0, 5);
+  gptStartContinuous(&GPTD_BFTM0, 1);
 
   // chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
   /* This is now the idle thread loop, you may perform here a low priority
