@@ -36,6 +36,9 @@
 
 #define LINE_LED_PWR                                       PAL_LINE(IOPORTB, 15)
 
+#define LINE_USART_TX                                      PAL_LINE(IOPORTA, 4 )
+#define LINE_USART_RX                                      PAL_LINE(IOPORTA, 5 )
+
 // PORTA 12,13 conflict SWD
 #define LINE_LED_COL_1                                     PAL_LINE(IOPORTA, 12)
 #define LINE_LED_COL_2                                     PAL_LINE(IOPORTA, 13)

@@ -61,11 +61,11 @@ ioline_t ledRows[NUM_ROW * 3] = {
 #define REFRESH_FREQUENCY           200
 
 uint16_t ledColors[NUM_COLUMN * NUM_ROW] = {
-  0xF00,0, 0x0F0,0, 0x00F, 0,0,0,0,0,0,0,0,0,
-  0xF00,0, 0x0F0,0, 0x00F, 0,0,0,0,0,0,0,0,0,
-  0xF00,0, 0x0F0,0, 0x00F, 0,0,0,0,0,0,0,0,0,
-  0xF00,0, 0x0F0,0, 0x00F, 0,0,0,0,0,0,0,0,0,
-  0xF00,0, 0x0F0,0, 0x00F, 0,0,0,0,0,0,0,0,0,
+  0xf,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
 static uint32_t currentColumn = 0;
 static uint32_t columnPWMCount = 0;
@@ -104,15 +104,21 @@ THD_FUNCTION(Thread1, arg) {
           palClearLine(LINE_LED_PWR);
           break;
         case CMD_LED_SET:
-          bytesRead = sdReadTimeout(&SD1, commandBuffer, 4, 1000);
-          if (bytesRead < 5) {
+          bytesRead = sdReadTimeout(&SD1, commandBuffer, 4, 10000);
+          if (bytesRead < 4)
             continue;
-          }
-          if (commandBuffer[0] >= NUM_ROW || commandBuffer[1] >= NUM_COLUMN) {
+          if (commandBuffer[0] >= NUM_ROW || commandBuffer[1] >= NUM_COLUMN)
             continue;
-          }
           ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]] = 
-            ((uint16_t)commandBuffer[2] << 8) | (commandBuffer[3] & 0xFF) ;
+            ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]) ;
+          break;
+        case CMD_LED_SET_ROW:
+          bytesRead = sdReadTimeout(&SD1, commandBuffer, sizeof(uint16_t) * NUM_COLUMN + 1, 1000);
+          if (bytesRead < sizeof(uint16_t) * NUM_COLUMN + 1)
+            continue;
+          if (commandBuffer[0] >= NUM_ROW)
+            continue;
+          memcpy(&ledColors[commandBuffer[0] * NUM_COLUMN],&commandBuffer[1], sizeof(uint16_t) * NUM_COLUMN);
           break;
         default:
           break;
@@ -175,11 +181,9 @@ int main(void) {
   halInit();
   chSysInit();
 
-  // Powerup LED
-  palSetLine(LINE_LED_PWR);
-
   // Setup UART1
   sdStart(&SD1, &usart1Config);
+  palSetLine(LINE_LED_PWR);
 
   // Setup Column Multiplex Timer
   gptStart(&GPTD_BFTM0, &bftm0Config);
