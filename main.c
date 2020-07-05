@@ -18,6 +18,7 @@
 #include "hal.h"
 #include "ch.h"
 #include "string.h"
+#include "ap2_qmk_led.h"
 
 static void columnCallback(GPTDriver* driver);
 
@@ -79,6 +80,8 @@ static const SerialConfig usart1Config = {
   .speed = 115200
 };
 
+static uint8_t commandBuffer[64];
+
 /*
  * Thread 1.
  */
@@ -89,6 +92,32 @@ THD_FUNCTION(Thread1, arg) {
 
   while (true)
   {
+    msg_t msg;
+    size_t bytesRead;
+    msg = sdGet(&SD1);
+    if (msg >= MSG_OK) {
+      switch (msg) {
+        case CMD_LED_ON:
+          palSetLine(LINE_LED_PWR);
+          break;
+        case CMD_LED_OFF:
+          palClearLine(LINE_LED_PWR);
+          break;
+        case CMD_LED_SET:
+          bytesRead = sdReadTimeout(&SD1, commandBuffer, 4, 1000);
+          if (bytesRead < 5) {
+            continue;
+          }
+          if (commandBuffer[0] >= NUM_ROW || commandBuffer[1] >= NUM_COLUMN) {
+            continue;
+          }
+          ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]] = 
+            ((uint16_t)commandBuffer[2] << 8) | (commandBuffer[3] & 0xFF) ;
+          break;
+        default:
+          break;
+      }
+    }
   }
 }
 
@@ -156,7 +185,7 @@ int main(void) {
   gptStart(&GPTD_BFTM0, &bftm0Config);
   gptStartContinuous(&GPTD_BFTM0, 1);
 
-  // chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
+  chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
   /* This is now the idle thread loop, you may perform here a low priority
      task but you must never try to sleep or wait in this loop. Note that
      this tasks runs at the lowest priority level so any instruction added
