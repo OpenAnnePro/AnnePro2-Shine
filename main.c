@@ -57,27 +57,7 @@ ioline_t ledRows[NUM_ROW * 3] = {
   LINE_LED_ROW_5_B,
 };
 
-/*
- * Thread 1.
- */
-THD_WORKING_AREA(waThread1, 128);
-THD_FUNCTION(Thread1, arg) {
-
-  (void)arg;
-
-  while (true)
-  {
-    for (size_t i = 0; i < NUM_COLUMN; i++)
-    {
-      palSetLine(ledColumns[i]);
-      chThdSleepMicroseconds(200);
-      palClearLine(ledColumns[i]);
-    }
-    
-  }
-}
-
-#define REFRESH_FREQUENCY           160
+#define REFRESH_FREQUENCY           200
 
 uint16_t ledColors[NUM_COLUMN * NUM_ROW] = {
   0xF00,0, 0x0F0,0, 0x00F, 0,0,0,0,0,0,0,0,0,
@@ -94,6 +74,23 @@ static const GPTConfig bftm0Config = {
   .frequency = NUM_COLUMN * REFRESH_FREQUENCY * 2 * 16,
   .callback = columnCallback
 };
+
+static const SerialConfig usart1Config = {
+  .speed = 115200
+};
+
+/*
+ * Thread 1.
+ */
+THD_WORKING_AREA(waThread1, 128);
+THD_FUNCTION(Thread1, arg) {
+
+  (void)arg;
+
+  while (true)
+  {
+  }
+}
 
 void columnCallback(GPTDriver* _driver)
 {
@@ -151,6 +148,9 @@ int main(void) {
 
   // Powerup LED
   palSetLine(LINE_LED_PWR);
+
+  // Setup UART1
+  sdStart(&SD1, &usart1Config);
 
   // Setup Column Multiplex Timer
   gptStart(&GPTD_BFTM0, &bftm0Config);

@@ -53,6 +53,9 @@
 #define HT32_GPT_USE_BFTM0                  TRUE
 #define HT32_GPT_BFTM0_IRQ_PRIORITY         4
 
+#define HT32_SERIAL_USE_USART1              TRUE
+#define HT32_USART0_IRQ_PRIORITY            3
+
 // #define HT32_GPT_USE_BFTM1                  TRUE
 // #define HT32_GPT_BFTM1_IRQ_PRIORITY         5
 /*
