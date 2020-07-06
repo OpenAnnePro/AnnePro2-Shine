@@ -19,8 +19,14 @@
 /*
  * Board identifier.
  */
+
+#ifdef C18
+#define ANNEPRO2_C18
+#define BOARD_NAME                  "Anne Pro 2 C18"
+#else
 #define ANNEPRO2_C15
 #define BOARD_NAME                  "Anne Pro 2 C15"
+#endif
 
 #define HT32F52342
 
@@ -34,6 +40,44 @@
 #define NUM_COLUMN                                         14
 #define NUM_ROW                                            5
 
+#ifdef C18
+#define LINE_LED_PWR                                       PAL_LINE(IOPORTA, 10)
+
+#define LINE_USART_TX                                      PAL_LINE(IOPORTA, 4 )
+#define LINE_USART_RX                                      PAL_LINE(IOPORTA, 5 )
+
+// PORTA 12,13 conflict SWD
+#define LINE_LED_COL_1                                     PAL_LINE(IOPORTB,  1)
+#define LINE_LED_COL_2                                     PAL_LINE(IOPORTD,  1)
+#define LINE_LED_COL_3                                     PAL_LINE(IOPORTD,  2)
+#define LINE_LED_COL_4                                     PAL_LINE(IOPORTD,  3)
+#define LINE_LED_COL_5                                     PAL_LINE(IOPORTC, 15)
+#define LINE_LED_COL_6                                     PAL_LINE(IOPORTC,  1)
+#define LINE_LED_COL_7                                     PAL_LINE(IOPORTC,  2)
+#define LINE_LED_COL_8                                     PAL_LINE(IOPORTC,  3)
+#define LINE_LED_COL_9                                     PAL_LINE(IOPORTB,  6)
+#define LINE_LED_COL_10                                    PAL_LINE(IOPORTB,  7)
+#define LINE_LED_COL_11                                    PAL_LINE(IOPORTB,  8)
+#define LINE_LED_COL_12                                    PAL_LINE(IOPORTA,  0)
+#define LINE_LED_COL_13                                    PAL_LINE(IOPORTA,  1)
+#define LINE_LED_COL_14                                    PAL_LINE(IOPORTA,  2)
+
+#define LINE_LED_ROW_1_R                                   PAL_LINE(IOPORTA, 11)
+#define LINE_LED_ROW_1_G                                   PAL_LINE(IOPORTB,  2)
+#define LINE_LED_ROW_1_B                                   PAL_LINE(IOPORTC, 14)
+#define LINE_LED_ROW_2_R                                   PAL_LINE(IOPORTA, 14)
+#define LINE_LED_ROW_2_G                                   PAL_LINE(IOPORTB,  3)
+#define LINE_LED_ROW_2_B                                   PAL_LINE(IOPORTA,  6)
+#define LINE_LED_ROW_3_R                                   PAL_LINE(IOPORTA, 15)
+#define LINE_LED_ROW_3_G                                   PAL_LINE(IOPORTB,  4)
+#define LINE_LED_ROW_3_B                                   PAL_LINE(IOPORTA,  7)
+#define LINE_LED_ROW_4_R                                   PAL_LINE(IOPORTB,  0)
+#define LINE_LED_ROW_4_G                                   PAL_LINE(IOPORTB,  5)
+#define LINE_LED_ROW_4_B                                   PAL_LINE(IOPORTC,  4)
+#define LINE_LED_ROW_5_R                                   PAL_LINE(IOPORTC,  7)
+#define LINE_LED_ROW_5_G                                   PAL_LINE(IOPORTC,  5)
+#define LINE_LED_ROW_5_B                                   PAL_LINE(IOPORTC,  6)
+#else
 #define LINE_LED_PWR                                       PAL_LINE(IOPORTB, 15)
 
 #define LINE_USART_TX                                      PAL_LINE(IOPORTA, 4 )
@@ -70,6 +114,7 @@
 #define LINE_LED_ROW_5_R                                   PAL_LINE(IOPORTC,  7)
 #define LINE_LED_ROW_5_G                                   PAL_LINE(IOPORTC,  5)
 #define LINE_LED_ROW_5_B                                   PAL_LINE(IOPORTC,  6)
+#endif
 
 
 #if !defined(_FROM_ASM_)

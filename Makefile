@@ -8,6 +8,10 @@ ifeq ($(USE_OPT),)
   USE_OPT = -O2 -ggdb -fomit-frame-pointer -falign-functions=16
 endif
 
+ifeq ($(MODEL), C18)
+  USE_OPT += -DC18
+endif
+
 # C specific options here (added to USE_OPT).
 ifeq ($(USE_COPT),)
   USE_COPT = 
