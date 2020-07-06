@@ -16,7 +16,7 @@ make
 ```
 or
 ```bash
-make MODEL=c18
+make MODEL=C18
 ```
 if you have the C18 revision.
 
