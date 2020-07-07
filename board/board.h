@@ -74,8 +74,8 @@
 #define LINE_LED_ROW_4_R                                   PAL_LINE(IOPORTB,  0)
 #define LINE_LED_ROW_4_G                                   PAL_LINE(IOPORTB,  5)
 #define LINE_LED_ROW_4_B                                   PAL_LINE(IOPORTC,  4)
-#define LINE_LED_ROW_5_R                                   PAL_LINE(IOPORTC,  7)
-#define LINE_LED_ROW_5_G                                   PAL_LINE(IOPORTC,  5)
+#define LINE_LED_ROW_5_R                                   PAL_LINE(IOPORTC,  5)
+#define LINE_LED_ROW_5_G                                   PAL_LINE(IOPORTC,  7)
 #define LINE_LED_ROW_5_B                                   PAL_LINE(IOPORTC,  6)
 #else
 #define LINE_LED_PWR                                       PAL_LINE(IOPORTB, 15)
