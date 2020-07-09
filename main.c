@@ -62,7 +62,7 @@ ioline_t ledRows[NUM_ROW * 3] = {
 
 #define LEN(a) (sizeof(a)/sizeof(*a))
 
-static const uint16_t colorCycle[] = {0x000, 0xF00, 0xFF0, 0x0F0, 0x0FF, 0x00F, 0xF0F, 0x5FF};
+static const uint16_t colorCycle[] = {0x000, 0xF00, 0xFF0, 0x0F0, 0x0FF, 0x00F, 0xF0F, 0x5FF, 0x000, 0x001};
 static uint16_t cycleIndex = 0;
 
 uint16_t ledColors[NUM_COLUMN * NUM_ROW] = {
@@ -103,21 +103,27 @@ THD_FUNCTION(Thread1, arg) {
     if (msg >= MSG_OK) {
       switch (msg) {
         case CMD_LED_ON:
-          if (colorCycle[cycleIndex]){
+          if (colorCycle[cycleIndex]==0){
+            for (uint16_t i=0; i<NUM_ROW; ++i){
+              for (uint16_t j=0; j<NUM_COLUMN; ++j){
+                ledColors[i*NUM_COLUMN+j] = colorCycle[i%LEN(colorCycle)];
+              }     
+            }
+          }
+          else if (colorCycle[cycleIndex]==1){
+            for (uint16_t i=0; i<NUM_COLUMN; ++i){
+              for (uint16_t j=0; j<NUM_ROW; ++j){
+                ledColors[j*NUM_COLUMN+i] = colorCycle[i%LEN(colorCycle)];
+              }     
+            }
+          }
+          else {
             for (uint16_t i=0; i<LEN(ledColors); ++i){
               ledColors[i] = colorCycle[cycleIndex];
             }
           }
-          else{
-            for (uint16_t i=0; i<NUM_ROW; ++i){
-              for (uint16_t j=0; j<NUM_COLUMN; ++j){
-                ledColors[i*NUM_COLUMN+j] = colorCycle[(i+1)%LEN(colorCycle)];
-              }     
-            }
-          }
-          cycleIndex = (cycleIndex+1)%LEN(colorCycle);
-
           palSetLine(LINE_LED_PWR);
+          cycleIndex = (cycleIndex+1)%LEN(colorCycle);
           break;
         case CMD_LED_OFF:
           cycleIndex = (cycleIndex+LEN(colorCycle)-1)%LEN(colorCycle);
@@ -147,43 +153,42 @@ THD_FUNCTION(Thread1, arg) {
   }
 }
 
+inline uint8_t min(uint8_t a, uint8_t b){
+  return a<=b?a:b;
+}
+
+inline void sPWM(uint8_t cycle, uint8_t currentCount, uint8_t start, ioline_t port){
+  if (start+cycle>0xF) start = 0xF - cycle;
+  if (start <= currentCount && currentCount < start+cycle)
+    palSetLine(port);
+  else
+    palClearLine(port);
+}
+
 void columnCallback(GPTDriver* _driver)
 {
   (void)_driver;
+  palClearLine(ledColumns[currentColumn]);
+  currentColumn = (currentColumn+1) % NUM_COLUMN;
+  palSetLine(ledColumns[currentColumn]);
   if (columnPWMCount < 16)
   {
     for (size_t row = 0; row < NUM_ROW; row++)
     {
     const uint16_t row_color = ledColors[currentColumn + (NUM_COLUMN * row)];
-    // R
-    if (((row_color >> 8) & 0xF) > columnPWMCount)
-      palSetLine(ledRows[row * 3]);
-    else if (((row_color >> 8) & 0xF) <= columnPWMCount)
-      palClearLine(ledRows[row * 3]);
-    // G
-    if (((row_color >> 4) & 0xF) > columnPWMCount)
-      palSetLine(ledRows[row * 3 + 1]);
-    else if (((row_color >> 4) & 0xF) <= columnPWMCount)
-      palClearLine(ledRows[row * 3 + 1]);
-    // B
-    if (((row_color >> 0) & 0xF) > columnPWMCount)
-      palSetLine(ledRows[row * 3 + 2]);
-    else if (((row_color >> 0) & 0xF) <= columnPWMCount)
-      palClearLine(ledRows[row * 3 + 2]);
+    const uint8_t red = (row_color >> 8) & 0xF;
+    const uint8_t green = (row_color >> 4) & 0xF;
+    const uint8_t blue = (row_color >> 0) & 0xF;
+
+    sPWM(red, columnPWMCount, 0, ledRows[row * 3]);
+    sPWM(green, columnPWMCount, red, ledRows[row * 3+1]);
+    sPWM(blue, columnPWMCount, red+green, ledRows[row * 3+2]);
     }
-  }
-  if (columnPWMCount == 15) {
-    palClearLine(ledColumns[currentColumn]);
-  }
-  if (columnPWMCount > 16)
-  {
-    palClearLine(ledColumns[currentColumn]);
-    if (++currentColumn >= NUM_COLUMN)
-      currentColumn = 0;
-    palSetLine(ledColumns[currentColumn]);
-    columnPWMCount = 0;
-  } else {
     columnPWMCount++;
+  }
+  else
+  {
+    columnPWMCount = 0;
   }
 }
 
