@@ -60,6 +60,11 @@ ioline_t ledRows[NUM_ROW * 3] = {
 
 #define REFRESH_FREQUENCY           200
 
+#define LEN(a) (sizeof(a)/sizeof(*a))
+
+static const uint16_t colorCycle[] = {0x000, 0xF00, 0xFF0, 0x0F0, 0x0FF, 0x00F, 0xF0F, 0x5FF};
+static uint16_t cycleIndex = 0;
+
 uint16_t ledColors[NUM_COLUMN * NUM_ROW] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -98,9 +103,24 @@ THD_FUNCTION(Thread1, arg) {
     if (msg >= MSG_OK) {
       switch (msg) {
         case CMD_LED_ON:
+          if (colorCycle[cycleIndex]){
+            for (uint16_t i=0; i<LEN(ledColors); ++i){
+              ledColors[i] = colorCycle[cycleIndex];
+            }
+          }
+          else{
+            for (uint16_t i=0; i<NUM_ROW; ++i){
+              for (uint16_t j=0; j<NUM_COLUMN; ++j){
+                ledColors[i*NUM_COLUMN+j] = colorCycle[(i+1)%LEN(colorCycle)];
+              }     
+            }
+          }
+          cycleIndex = (cycleIndex+1)%LEN(colorCycle);
+
           palSetLine(LINE_LED_PWR);
           break;
         case CMD_LED_OFF:
+          cycleIndex = (cycleIndex+LEN(colorCycle)-1)%LEN(colorCycle);
           palClearLine(LINE_LED_PWR);
           break;
         case CMD_LED_SET:
