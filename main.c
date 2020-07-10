@@ -176,9 +176,9 @@ void columnCallback(GPTDriver* _driver)
     for (size_t row = 0; row < NUM_ROW; row++)
     {
     const uint16_t row_color = ledColors[currentColumn + (NUM_COLUMN * row)];
-    const uint8_t red = (row_color >> 8) & 0xF;
-    const uint8_t green = (row_color >> 4) & 0xF;
-    const uint8_t blue = (row_color >> 0) & 0xF;
+    const uint8_t red = ((row_color >> 8) & 0xF) >> 1;
+    const uint8_t green = ((row_color >> 4) & 0xF) >> 1;
+    const uint8_t blue = ((row_color >> 0) & 0xF) >> 1;
 
     sPWM(red, columnPWMCount, 0, ledRows[row * 3]);
     sPWM(green, columnPWMCount, red, ledRows[row * 3+1]);
