@@ -62,8 +62,18 @@ ioline_t ledRows[NUM_ROW * 3] = {
 
 #define LEN(a) (sizeof(a)/sizeof(*a))
 
-static const uint16_t colorCycle[] = {0x000, 0xF00, 0xFF0, 0x0F0, 0x0FF, 0x00F, 0xF0F, 0x5FF, 0x000, 0x001};
-static uint16_t cycleIndex = 0;
+// An array of basic colors used accross different lighting profiles
+static const uint16_t colorPalette[] = {0xF00, 0xFF0, 0x0F0, 0x0FF, 0x00F, 0xF0F, 0x5FF};
+
+// The total number of lighting profiles. Each color in the color palette is a static profile of its own + custom ones 
+static const uint16_t NUM_LIGHTING_PROFILES = LEN(colorPalette) + 3;
+
+// Modifier keys IDs (all keys except letters)
+static const uint16_t modKeyIDs[] = {0, 13, 14, 27, 28, 40, 41, 42, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69};
+
+// Indicates the ID of the current lighting profile
+static uint16_t lightingProfile = 0;
+
 
 uint16_t ledColors[NUM_COLUMN * NUM_ROW] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -103,30 +113,48 @@ THD_FUNCTION(Thread1, arg) {
     if (msg >= MSG_OK) {
       switch (msg) {
         case CMD_LED_ON:
-          if (colorCycle[cycleIndex]==0){
-            for (uint16_t i=0; i<NUM_ROW; ++i){
-              for (uint16_t j=0; j<NUM_COLUMN; ++j){
-                ledColors[i*NUM_COLUMN+j] = colorCycle[i%LEN(colorCycle)];
-              }     
-            }
-          }
-          else if (colorCycle[cycleIndex]==1){
-            for (uint16_t i=0; i<NUM_COLUMN; ++i){
-              for (uint16_t j=0; j<NUM_ROW; ++j){
-                ledColors[j*NUM_COLUMN+i] = colorCycle[i%LEN(colorCycle)];
-              }     
-            }
-          }
-          else {
-            for (uint16_t i=0; i<LEN(ledColors); ++i){
-              ledColors[i] = colorCycle[cycleIndex];
-            }
+
+          switch(lightingProfile){
+
+            // Horizontal Rainbow Profile
+            case LEN(colorPalette):
+              for (uint16_t i=0; i<NUM_ROW; ++i){
+                for (uint16_t j=0; j<NUM_COLUMN; ++j){
+                  ledColors[i*NUM_COLUMN+j] = colorPalette[i%LEN(colorPalette)];
+                }     
+              }
+              break;
+
+            // Vertical Rainbow Profile
+            case LEN(colorPalette) + 1:
+              for (uint16_t i=0; i<NUM_COLUMN; ++i){
+                for (uint16_t j=0; j<NUM_ROW; ++j){
+                  ledColors[j*NUM_COLUMN+i] = colorPalette[i%LEN(colorPalette)];
+                }     
+              }
+              break;
+
+            // Miami Nights Profile
+            case LEN(colorPalette) + 2:
+              for (uint16_t i=0; i<LEN(ledColors); ++i){
+                ledColors[i] = 0x0FF;
+              }
+              for (uint16_t i=0; i<LEN(modKeyIDs); ++i){
+                ledColors[modKeyIDs[i]] = 0xF0F;
+              }
+              break;
+
+            // Static Single Color Profiles
+            default:
+              for (uint16_t i=0; i<LEN(ledColors); ++i){
+                ledColors[i] = colorPalette[lightingProfile];
+              }
           }
           palSetLine(LINE_LED_PWR);
-          cycleIndex = (cycleIndex+1)%LEN(colorCycle);
+          lightingProfile = (lightingProfile+1)%NUM_LIGHTING_PROFILES;
           break;
         case CMD_LED_OFF:
-          cycleIndex = (cycleIndex+LEN(colorCycle)-1)%LEN(colorCycle);
+          lightingProfile = (lightingProfile+LEN(colorPalette)-1)%LEN(colorPalette);
           palClearLine(LINE_LED_PWR);
           break;
         case CMD_LED_SET:
