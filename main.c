@@ -68,11 +68,12 @@ static const uint16_t colorPalette[] = {0xF00, 0xFF0, 0x0F0, 0x0FF, 0x00F, 0xF0F
 // The total number of lighting profiles. Each color in the color palette is a static profile of its own + custom ones 
 static const uint16_t NUM_LIGHTING_PROFILES = LEN(colorPalette) + 3;
 
+// Modifier keys IDs (all keys except letters)
+static const uint16_t modKeyIDs[] = {0, 13, 14, 27, 28, 40, 41, 42, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69};
+
 // Indicates the ID of the current lighting profile
 static uint16_t lightingProfile = 0;
 
-// Modifier keys IDs (all keys except letters)
-uint16_t modKeyIDs[] = {0, 13, 14, 27, 28, 41, 42, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69};
 
 uint16_t ledColors[NUM_COLUMN * NUM_ROW] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,
