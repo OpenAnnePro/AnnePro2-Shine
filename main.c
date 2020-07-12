@@ -19,6 +19,7 @@
 #include "ch.h"
 #include "string.h"
 #include "ap2_qmk_led.h"
+#include "light_utils.h"
 
 static void columnCallback(GPTDriver* driver);
 static void animationCallback(GPTDriver* driver);
@@ -61,7 +62,7 @@ ioline_t ledRows[NUM_ROW * 3] = {
 
 #define REFRESH_FREQUENCY           200
 
-#define ANIMATION_FREQUENCY         2
+#define ANIMATION_TIMER_FREQUENCY   60
 
 #define LEN(a) (sizeof(a)/sizeof(*a))
 
@@ -70,9 +71,6 @@ static const uint16_t colorPalette[] = {0xF00, 0xFF0, 0x0F0, 0x0FF, 0x00F, 0xF0F
 
 // The total number of lighting profiles. Each color in the color palette is a static profile of its own + custom ones 
 static const uint16_t NUM_LIGHTING_PROFILES = LEN(colorPalette) + 4;
-
-// Modifier keys IDs (all keys except letters)
-static const uint16_t modKeyIDs[] = {0, 13, 14, 27, 28, 40, 41, 42, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69};
 
 // Indicates the ID of the current lighting profile
 static uint16_t lightingProfile = 0;
@@ -99,7 +97,7 @@ static const GPTConfig bftm0Config = {
 
 // Lighting animation refresh timer
 static const GPTConfig lightAnimationConfig = {
-  .frequency = ANIMATION_FREQUENCY,
+  .frequency = ANIMATION_TIMER_FREQUENCY,
   .callback = animationCallback
 };
 
@@ -148,12 +146,8 @@ THD_FUNCTION(Thread1, arg) {
 
             // Miami Nights Profile
             case LEN(colorPalette) + 2:
-              for (uint16_t i=0; i<LEN(ledColors); ++i){
-                ledColors[i] = 0x0FF;
-              }
-              for (uint16_t i=0; i<LEN(modKeyIDs); ++i){
-                ledColors[modKeyIDs[i]] = 0xF0F;
-              }
+              setAllKeysColor(ledColors, 0x0FF);
+              setModKeysColor(ledColors, 0xF0F);
               break;
 
             // Animated Rainbow
@@ -167,9 +161,7 @@ THD_FUNCTION(Thread1, arg) {
 
             // Static Single Color Profiles
             default:
-              for (uint16_t i=0; i<LEN(ledColors); ++i){
-                ledColors[i] = colorPalette[lightingProfile];
-              }
+              setAllKeysColor(ledColors, colorPalette[lightingProfile]);
           }
           palSetLine(LINE_LED_PWR);
           lightingProfile = (lightingProfile+1)%NUM_LIGHTING_PROFILES;
@@ -216,17 +208,21 @@ inline void sPWM(uint8_t cycle, uint8_t currentCount, uint8_t start, ioline_t po
 
 // Update lighting table as per animation
 void animationCallback(GPTDriver* _driver){
+  
+  // Update lighting according to the current lighting profile
   switch(lightingProfile){
-    // Bellow line stops compiler warnings
-    (void)_driver;
+    
     // Vertical Rainbow Profile
     case 0:
+      // Set refresh rate for this animation
+      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/5);
+      // Update led colors
       for (uint16_t i=0; i<NUM_COLUMN; ++i){
         for (uint16_t j=0; j<NUM_ROW; ++j){
           ledColors[j*NUM_COLUMN+i] = colorPalette[(i + colAnimOffset)%LEN(colorPalette)];
         }     
       }
-      colAnimOffset = colAnimOffset + 1;
+      colAnimOffset = (colAnimOffset + 1)%LEN(colorPalette);
       break;
 
   }
