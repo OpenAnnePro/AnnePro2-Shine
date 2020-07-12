@@ -21,6 +21,7 @@
 #include "ap2_qmk_led.h"
 
 static void columnCallback(GPTDriver* driver);
+static void animationCallback(GPTDriver* driver);
 
 
 ioline_t ledColumns[NUM_COLUMN] = {
@@ -60,19 +61,24 @@ ioline_t ledRows[NUM_ROW * 3] = {
 
 #define REFRESH_FREQUENCY           200
 
+#define ANIMATION_FREQUENCY         2
+
 #define LEN(a) (sizeof(a)/sizeof(*a))
 
 // An array of basic colors used accross different lighting profiles
 static const uint16_t colorPalette[] = {0xF00, 0xFF0, 0x0F0, 0x0FF, 0x00F, 0xF0F, 0x5FF};
 
 // The total number of lighting profiles. Each color in the color palette is a static profile of its own + custom ones 
-static const uint16_t NUM_LIGHTING_PROFILES = LEN(colorPalette) + 3;
+static const uint16_t NUM_LIGHTING_PROFILES = LEN(colorPalette) + 4;
 
 // Modifier keys IDs (all keys except letters)
 static const uint16_t modKeyIDs[] = {0, 13, 14, 27, 28, 40, 41, 42, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69};
 
 // Indicates the ID of the current lighting profile
 static uint16_t lightingProfile = 0;
+
+// Column offset for rainbow animation
+static uint16_t colAnimOffset = 0;
 
 
 uint16_t ledColors[NUM_COLUMN * NUM_ROW] = {
@@ -89,6 +95,12 @@ static uint32_t columnPWMCount = 0;
 static const GPTConfig bftm0Config = {
   .frequency = NUM_COLUMN * REFRESH_FREQUENCY * 2 * 16,
   .callback = columnCallback
+};
+
+// Lighting animation refresh timer
+static const GPTConfig lightAnimationConfig = {
+  .frequency = ANIMATION_FREQUENCY,
+  .callback = animationCallback
 };
 
 static const SerialConfig usart1Config = {
@@ -144,6 +156,15 @@ THD_FUNCTION(Thread1, arg) {
               }
               break;
 
+            // Animated Rainbow
+            case LEN(colorPalette) + 3:
+              for (uint16_t i=0; i<NUM_COLUMN; ++i){
+                for (uint16_t j=0; j<NUM_ROW; ++j){
+                  ledColors[j*NUM_COLUMN+i] = colorPalette[i%LEN(colorPalette)];
+                }     
+              }
+              break;
+
             // Static Single Color Profiles
             default:
               for (uint16_t i=0; i<LEN(ledColors); ++i){
@@ -191,6 +212,24 @@ inline void sPWM(uint8_t cycle, uint8_t currentCount, uint8_t start, ioline_t po
     palSetLine(port);
   else
     palClearLine(port);
+}
+
+// Update lighting table as per animation
+void animationCallback(GPTDriver* _driver){
+  switch(lightingProfile){
+    // Bellow line stops compiler warnings
+    (void)_driver;
+    // Vertical Rainbow Profile
+    case 0:
+      for (uint16_t i=0; i<NUM_COLUMN; ++i){
+        for (uint16_t j=0; j<NUM_ROW; ++j){
+          ledColors[j*NUM_COLUMN+i] = colorPalette[(i + colAnimOffset)%LEN(colorPalette)];
+        }     
+      }
+      colAnimOffset = colAnimOffset + 1;
+      break;
+
+  }
 }
 
 void columnCallback(GPTDriver* _driver)
@@ -241,6 +280,10 @@ int main(void) {
   // Setup Column Multiplex Timer
   gptStart(&GPTD_BFTM0, &bftm0Config);
   gptStartContinuous(&GPTD_BFTM0, 1);
+
+  // Setup Animation Timer
+  gptStart(&GPTD_BFTM1, &lightAnimationConfig);
+  gptStartContinuous(&GPTD_BFTM1, 1);
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
   /* This is now the idle thread loop, you may perform here a low priority
