@@ -198,14 +198,6 @@ inline uint8_t min(uint8_t a, uint8_t b){
   return a<=b?a:b;
 }
 
-inline void sPWM(uint8_t cycle, uint8_t currentCount, uint8_t start, ioline_t port){
-  if (start+cycle>0xF) start = 0xF - cycle;
-  if (start <= currentCount && currentCount < start+cycle)
-    palSetLine(port);
-  else
-    palClearLine(port);
-}
-
 // Update lighting table as per animation
 void animationCallback(GPTDriver* _driver){
   
@@ -231,13 +223,13 @@ void animationCallback(GPTDriver* _driver){
 void columnCallback(GPTDriver* _driver)
 {
   (void)_driver;
-  if (columnPWMCount < 16) {
+  if (columnPWMCount < 255) {
     for (size_t row = 0; row < NUM_ROW; row++) {
     const uint32_t row_color = ledColors[currentColumn + (NUM_COLUMN * row)];
 
-    const uint8_t red = ((row_color >> 16) & 0xFF) >> 1;
-    const uint8_t green = ((row_color >> 8) & 0xFF) >> 1;
-    const uint8_t blue = ((row_color >> 0) & 0xFF) >> 1;
+    const uint8_t red = ((row_color >> 16) & 0xFF);
+    const uint8_t green = ((row_color >> 8) & 0xFF);
+    const uint8_t blue = ((row_color >> 0) & 0xFF);
 
     // R
     if (red > columnPWMCount)
