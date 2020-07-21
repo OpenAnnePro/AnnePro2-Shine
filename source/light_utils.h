@@ -4,5 +4,5 @@
 /*
     Function Signatures
 */
-void setAllKeysColor(uint16_t* ledColors, uint16_t color);
-void setModKeysColor(uint16_t* ledColors, uint16_t color);
+void setAllKeysColor(uint32_t* ledColors, uint32_t color);
+void setModKeysColor(uint32_t* ledColors, uint32_t color);

@@ -67,19 +67,19 @@ ioline_t ledRows[NUM_ROW * 3] = {
 #define LEN(a) (sizeof(a)/sizeof(*a))
 
 // An array of basic colors used accross different lighting profiles
-static const uint16_t colorPalette[] = {0xF00, 0xFF0, 0x0F0, 0x0FF, 0x00F, 0xF0F, 0x5FF};
+static const uint32_t colorPalette[] = {0xF0000, 0xF0F00, 0x00F00, 0x00F0F, 0x0000F, 0xF000F, 0x50F0F};
 
 // The total number of lighting profiles. Each color in the color palette is a static profile of its own + custom ones 
 static const uint16_t NUM_LIGHTING_PROFILES = LEN(colorPalette) + 4;
 
 // Indicates the ID of the current lighting profile
-static uint16_t lightingProfile = 0;
+static uint8_t lightingProfile = 0;
 
 // Column offset for rainbow animation
-static uint16_t colAnimOffset = 0;
+static uint8_t colAnimOffset = 0;
 
 
-uint16_t ledColors[NUM_COLUMN * NUM_ROW] = {
+uint32_t ledColors[NUM_COLUMN * NUM_ROW] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -146,8 +146,8 @@ THD_FUNCTION(Thread1, arg) {
 
             // Miami Nights Profile
             case LEN(colorPalette) + 2:
-              setAllKeysColor(ledColors, 0x0FF);
-              setModKeysColor(ledColors, 0xF0F);
+              setAllKeysColor(ledColors, 0x00F0F);
+              setModKeysColor(ledColors, 0xF000F);
               break;
 
             // Animated Rainbow
@@ -231,29 +231,46 @@ void animationCallback(GPTDriver* _driver){
 void columnCallback(GPTDriver* _driver)
 {
   (void)_driver;
-  palClearLine(ledColumns[currentColumn]);
-  currentColumn = (currentColumn+1) % NUM_COLUMN;
-  palSetLine(ledColumns[currentColumn]);
-  if (columnPWMCount < 16)
-  {
-    for (size_t row = 0; row < NUM_ROW; row++)
-    {
-    const uint16_t row_color = ledColors[currentColumn + (NUM_COLUMN * row)];
-    const uint8_t red = ((row_color >> 8) & 0xF) >> 1;
-    const uint8_t green = ((row_color >> 4) & 0xF) >> 1;
-    const uint8_t blue = ((row_color >> 0) & 0xF) >> 1;
+  if (columnPWMCount < 16) {
+    for (size_t row = 0; row < NUM_ROW; row++) {
+    const uint32_t row_color = ledColors[currentColumn + (NUM_COLUMN * row)];
+    const uint8_t red = ((row_color >> 16) & 0xFF) >> 1;
+    const uint8_t green = ((row_color >> 8) & 0xFF) >> 1;
+    const uint8_t blue = ((row_color >> 0) & 0xFF) >> 1;
 
-    sPWM(red, columnPWMCount, 0, ledRows[row * 3]);
-    sPWM(green, columnPWMCount, red, ledRows[row * 3+1]);
-    sPWM(blue, columnPWMCount, red+green, ledRows[row * 3+2]);
+    // R
+    if (red > columnPWMCount)
+      palSetLine(ledRows[row * 3]);
+    else
+      palClearLine(ledRows[row * 3]);
+    // G
+    if (green > columnPWMCount)
+      palSetLine(ledRows[row * 3 + 1]);
+    else
+      palClearLine(ledRows[row * 3 + 1]);
+    // B
+    if (blue > columnPWMCount)
+      palSetLine(ledRows[row * 3 + 2]);
+    else
+      palClearLine(ledRows[row * 3 + 2]);
     }
+  }
+
+  if (columnPWMCount == 15) {
+    palClearLine(ledColumns[currentColumn]);
+  }
+
+  if (columnPWMCount > 16) {
+    palClearLine(ledColumns[currentColumn]);
+    if (++currentColumn >= NUM_COLUMN)
+      currentColumn = 0;
+    palSetLine(ledColumns[currentColumn]);
+    columnPWMCount = 0;
+  } else {
     columnPWMCount++;
   }
-  else
-  {
-    columnPWMCount = 0;
-  }
 }
+
 
 /*
  * Application entry point.
