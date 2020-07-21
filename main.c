@@ -234,6 +234,7 @@ void columnCallback(GPTDriver* _driver)
   if (columnPWMCount < 16) {
     for (size_t row = 0; row < NUM_ROW; row++) {
     const uint32_t row_color = ledColors[currentColumn + (NUM_COLUMN * row)];
+
     const uint8_t red = ((row_color >> 16) & 0xFF) >> 1;
     const uint8_t green = ((row_color >> 8) & 0xFF) >> 1;
     const uint8_t blue = ((row_color >> 0) & 0xFF) >> 1;
@@ -254,21 +255,14 @@ void columnCallback(GPTDriver* _driver)
     else
       palClearLine(ledRows[row * 3 + 2]);
     }
-  }
-
-  if (columnPWMCount == 15) {
+    columnPWMCount++;
+  }else {
     palClearLine(ledColumns[currentColumn]);
-  }
-
-  if (columnPWMCount > 16) {
-    palClearLine(ledColumns[currentColumn]);
-    if (++currentColumn >= NUM_COLUMN)
-      currentColumn = 0;
+    currentColumn = (currentColumn + 1) % NUM_COLUMN;
     palSetLine(ledColumns[currentColumn]);
     columnPWMCount = 0;
-  } else {
-    columnPWMCount++;
   }
+
 }
 
 
