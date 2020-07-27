@@ -80,14 +80,7 @@ static uint8_t lightingProfile = 0;
 // Column offset for rainbow animation
 static uint8_t colAnimOffset = 0;
 
-
-uint32_t ledColors[NUM_COLUMN * NUM_ROW] = {
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-};
+led ledColors[70];
 static uint32_t currentColumn = 0;
 static uint32_t columnPWMCount = 0;
 
@@ -132,7 +125,7 @@ THD_FUNCTION(Thread1, arg) {
             case LEN(colorPalette):
               for (uint16_t i=0; i<NUM_ROW; ++i){
                 for (uint16_t j=0; j<NUM_COLUMN; ++j){
-                  ledColors[i*NUM_COLUMN+j] = colorPalette[i%LEN(colorPalette)];
+                  setKeyColor(&ledColors[i*NUM_COLUMN+j], colorPalette[i%LEN(colorPalette)]);
                 }     
               }
               break;
@@ -141,7 +134,7 @@ THD_FUNCTION(Thread1, arg) {
             case LEN(colorPalette) + 1:
               for (uint16_t i=0; i<NUM_COLUMN; ++i){
                 for (uint16_t j=0; j<NUM_ROW; ++j){
-                  ledColors[j*NUM_COLUMN+i] = colorPalette[i%LEN(colorPalette)];
+                  setKeyColor(&ledColors[j*NUM_COLUMN+i], colorPalette[i%LEN(colorPalette)]);
                 }     
               }
               break;
@@ -156,7 +149,7 @@ THD_FUNCTION(Thread1, arg) {
             case LEN(colorPalette) + 3:
               for (uint16_t i=0; i<NUM_COLUMN; ++i){
                 for (uint16_t j=0; j<NUM_ROW; ++j){
-                  ledColors[j*NUM_COLUMN+i] = colorPalette[i%LEN(colorPalette)];
+                  setKeyColor(&ledColors[j*NUM_COLUMN+i], colorPalette[i%LEN(colorPalette)]);
                 }     
               }
               break;
@@ -178,8 +171,7 @@ THD_FUNCTION(Thread1, arg) {
             continue;
           if (commandBuffer[0] >= NUM_ROW || commandBuffer[1] >= NUM_COLUMN)
             continue;
-          ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]] = 
-            ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]) ;
+          setKeyColor(&ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]], ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]));
           break;
         case CMD_LED_SET_ROW:
           bytesRead = sdReadTimeout(&SD1, commandBuffer, sizeof(uint16_t) * NUM_COLUMN + 1, 1000);
@@ -213,7 +205,7 @@ void animationCallback(GPTDriver* _driver){
       // Update led colors
       for (uint16_t i=0; i<NUM_COLUMN; ++i){
         for (uint16_t j=0; j<NUM_ROW; ++j){
-          ledColors[j*NUM_COLUMN+i] = colorPalette[(i + colAnimOffset)%LEN(colorPalette)];
+          setKeyColor(&ledColors[j*NUM_COLUMN+i], colorPalette[(i + colAnimOffset)%LEN(colorPalette)]);
         }     
       }
       colAnimOffset = (colAnimOffset + 1)%LEN(colorPalette);
@@ -240,10 +232,10 @@ void columnCallback(GPTDriver* _driver)
   {
     for (size_t row = 0; row < NUM_ROW; row++)
     {
-    const uint32_t row_color = ledColors[currentColumn + (NUM_COLUMN * row)];
-    const uint8_t red = ((row_color >> 16) & 0xFF);
-    const uint8_t green = ((row_color >> 8) & 0xFF);
-    const uint8_t blue = ((row_color >> 0) & 0xFF);
+    const led keyLED = ledColors[currentColumn + (NUM_COLUMN * row)];
+    const uint8_t red = keyLED.red;
+    const uint8_t green = keyLED.green;
+    const uint8_t blue = keyLED.blue;
 
     sPWM(red, columnPWMCount, 0, ledRows[row * 3]);
     sPWM(green, columnPWMCount, red, ledRows[row * 3+1]);
