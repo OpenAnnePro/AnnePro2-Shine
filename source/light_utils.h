@@ -5,9 +5,9 @@
     Structs
 */
 // Struct defining an LED and its RGB color components
-typedef struct led{
+typedef struct {
     uint8_t red, green, blue;
-}led;
+} led_t;
 
 /*
     Function Signatures
