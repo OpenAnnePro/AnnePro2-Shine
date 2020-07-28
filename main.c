@@ -118,6 +118,9 @@ THD_FUNCTION(Thread1, arg) {
     if (msg >= MSG_OK) {
       switch (msg) {
         case CMD_LED_ON:
+          
+          // Disable Interrupts while switching lighting profiles to avoid glitches
+          chSysLock();
 
           switch(lightingProfile){
 
@@ -160,6 +163,9 @@ THD_FUNCTION(Thread1, arg) {
           }
           palSetLine(LINE_LED_PWR);
           lightingProfile = (lightingProfile+1)%NUM_LIGHTING_PROFILES;
+
+          // Enable interrupts
+          chSysUnlock();
           break;
         case CMD_LED_OFF:
           lightingProfile = (lightingProfile+LEN(colorPalette)-1)%LEN(colorPalette);
