@@ -26,7 +26,7 @@ static const uint8_t modKeyIDs[] = {0, 13, 14, 28, 40, 41, 42, 54, 55, 56, 57, 5
 */
 
 // Set all keys lighting to a specific color
-void setAllKeysColor(led* ledColors, uint32_t color){
+void setAllKeysColor(led_t* ledColors, uint32_t color){
     const uint8_t red = (color >> 16) & 0xFF;
     const uint8_t green = (color >> 8) & 0xFF;
     const uint8_t blue = color & 0xFF;
@@ -39,7 +39,7 @@ void setAllKeysColor(led* ledColors, uint32_t color){
 }
 
 // Set modifier keys lighting to a specific color
-void setModKeysColor(led* ledColors, uint32_t color){
+void setModKeysColor(led_t* ledColors, uint32_t color){
     const uint8_t red = (color >> 16) & 0xFF;
     const uint8_t green = (color >> 8) & 0xFF;
     const uint8_t blue = color & 0xFF;
@@ -52,7 +52,7 @@ void setModKeysColor(led* ledColors, uint32_t color){
 }
 
 // Set specific key color
-void setKeyColor(led *key, uint32_t color){
+void setKeyColor(led_t *key, uint32_t color){
     key->red = (color >> 16) & 0xFF;
     key->green = (color >> 8) & 0xFF;
     key->blue = color & 0xFF;

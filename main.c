@@ -80,7 +80,7 @@ static uint8_t lightingProfile = 0;
 // Column offset for rainbow animation
 static uint8_t colAnimOffset = 0;
 
-led ledColors[70];
+led_t ledColors[70];
 static uint32_t currentColumn = 0;
 static uint32_t columnPWMCount = 0;
 
@@ -238,7 +238,7 @@ void columnCallback(GPTDriver* _driver)
   {
     for (size_t row = 0; row < NUM_ROW; row++)
     {
-    const led keyLED = ledColors[currentColumn + (NUM_COLUMN * row)];
+    const led_t keyLED = ledColors[currentColumn + (NUM_COLUMN * row)];
     const uint8_t red = keyLED.red;
     const uint8_t green = keyLED.green;
     const uint8_t blue = keyLED.blue;
