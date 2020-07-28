@@ -2,7 +2,16 @@
 #include "hal.h"
 
 /*
+    Structs
+*/
+// Struct defining an LED and its RGB color components
+typedef struct {
+    uint8_t red, green, blue;
+} led_t;
+
+/*
     Function Signatures
 */
-void setAllKeysColor(uint32_t* ledColors, uint32_t color);
-void setModKeysColor(uint32_t* ledColors, uint32_t color);
+void setAllKeysColor(led_t* ledColors, uint32_t color);
+void setModKeysColor(led_t* ledColors, uint32_t color);
+void setKeyColor(led_t *key, uint32_t color);

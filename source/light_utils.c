@@ -26,15 +26,34 @@ static const uint8_t modKeyIDs[] = {0, 13, 14, 28, 40, 41, 42, 54, 55, 56, 57, 5
 */
 
 // Set all keys lighting to a specific color
-void setAllKeysColor(uint32_t* ledColors, uint32_t color){
+void setAllKeysColor(led_t* ledColors, uint32_t color){
+    const uint8_t red = (color >> 16) & 0xFF;
+    const uint8_t green = (color >> 8) & 0xFF;
+    const uint8_t blue = color & 0xFF;
+
     for (uint16_t i=0; i<NUM_COLUMN * NUM_ROW; ++i){
-        ledColors[i] = color;
+        ledColors[i].red = red;
+        ledColors[i].green = green;
+        ledColors[i].blue = blue;
     }
 }
 
 // Set modifier keys lighting to a specific color
-void setModKeysColor(uint32_t* ledColors, uint32_t color){
+void setModKeysColor(led_t* ledColors, uint32_t color){
+    const uint8_t red = (color >> 16) & 0xFF;
+    const uint8_t green = (color >> 8) & 0xFF;
+    const uint8_t blue = color & 0xFF;
+    
     for (uint16_t i=0; i<LEN(modKeyIDs); ++i){
-        ledColors[modKeyIDs[i]] = color;
+        ledColors[modKeyIDs[i]].red = red;
+        ledColors[modKeyIDs[i]].green = green;
+        ledColors[modKeyIDs[i]].blue = blue;
     }
+}
+
+// Set specific key color
+void setKeyColor(led_t *key, uint32_t color){
+    key->red = (color >> 16) & 0xFF;
+    key->green = (color >> 8) & 0xFF;
+    key->blue = color & 0xFF;
 }
