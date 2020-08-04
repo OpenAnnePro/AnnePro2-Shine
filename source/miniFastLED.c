@@ -14,10 +14,10 @@
 // Shared array used to place in the results of hsv2rgb
 uint8_t rgbArray[3];
 
-// Convert HSV to RGB
+// Convert HSV to RGB and write results to rgbResults
 void hsv2rgb(uint8_t hue, uint8_t sat, uint8_t val, uint8_t* rgbResults){
 
-        // Convert hue, saturation and brightness ( HSV/HSB ) to RGB
+    // Convert hue, saturation and brightness ( HSV/HSB ) to RGB
     // "Dimming" is used on saturation and brightness to make
     // the output more visually linear.
 

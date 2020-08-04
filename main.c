@@ -252,7 +252,7 @@ void animationCallback(GPTDriver* _driver){
       }else if(value <= 0){
         direction = 1;
       }
-      value+=direction;
+      value += direction;
       break;
 
     // Spectrum
@@ -264,7 +264,7 @@ void animationCallback(GPTDriver* _driver){
       }else if(value <= 1){
         direction = 1;
       }
-      value+=direction;
+      value += direction;
       break;
 
     // Rainbow Flow
