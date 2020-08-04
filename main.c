@@ -20,6 +20,7 @@
 #include "string.h"
 #include "ap2_qmk_led.h"
 #include "light_utils.h"
+#include "miniFastLED.h"
 
 static void columnCallback(GPTDriver* driver);
 static void animationCallback(GPTDriver* driver);
@@ -70,15 +71,21 @@ ioline_t ledRows[NUM_ROW * 3] = {
 // static const uint32_t colorPalette[] = {0xFF0000, 0xF0F00, 0x00F00, 0x00F0F, 0x0000F, 0xF000F, 0x50F0F};
 static const uint32_t colorPalette[] = {0x9c0000, 0x9c9900, 0x1f9c00, 0x00979c, 0x003e9c, 0x39009c, 0x9c008f};
 
-
 // The total number of lighting profiles. Each color in the color palette is a static profile of its own + custom ones 
-static const uint16_t NUM_LIGHTING_PROFILES = LEN(colorPalette) + 4;
+static const uint16_t NUM_LIGHTING_PROFILES = LEN(colorPalette) + 8;
 
 // Indicates the ID of the current lighting profile
 static uint8_t lightingProfile = 0;
 
 // Column offset for rainbow animation
 static uint8_t colAnimOffset = 0;
+
+// Variables for Breathing and Spectrum Effect
+static uint8_t value = 180;
+static int direction = -1;
+
+// Variables for Rainbow Flow
+static uint8_t values[NUM_COLUMN];
 
 led_t ledColors[70];
 static uint32_t currentColumn = 0;
@@ -148,8 +155,40 @@ THD_FUNCTION(Thread1, arg) {
               setModKeysColor(ledColors, 0x9c008f);
               break;
 
-            // Animated Rainbow
+            // Breathing
             case LEN(colorPalette) + 3:
+              value = 180;
+              direction = -1;
+              setAllKeysColorHSV(ledColors, 125, 255, value);
+              break;
+
+            // Spectrum
+            case LEN(colorPalette) + 4:
+              value = 2;
+              direction = 1;
+              setAllKeysColorHSV(ledColors, value, 255, 125);
+              break;
+
+            // Rainbow Flow
+            case LEN(colorPalette) + 5:
+              // Initialize variables and set initial keyes values
+              for(int i = 0; i < NUM_COLUMN; i++){
+                values[i] = i*11;
+                setColumnColorHSV(ledColors, i, values[i], 255, 120);
+              }
+              break;
+
+            // Rainbow Waterfall
+            case LEN(colorPalette) + 6:
+              // Initialize variables and set initial keyes values
+              for(int i = 0; i < NUM_ROW; i++){
+                values[i] = i*10;
+                setRowColorHSV(ledColors, i, values[i], 255, 120);
+              }
+              break;
+
+            // Animated Rainbow
+            case LEN(colorPalette) + 7:
               for (uint16_t i=0; i<NUM_COLUMN; ++i){
                 for (uint16_t j=0; j<NUM_ROW; ++j){
                   setKeyColor(&ledColors[j*NUM_COLUMN+i], colorPalette[i%LEN(colorPalette)]);
@@ -203,6 +242,54 @@ void animationCallback(GPTDriver* _driver){
   
   // Update lighting according to the current lighting profile
   switch(lightingProfile){
+
+    // Breathing
+    case LEN(colorPalette) + 4:
+      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
+      setAllKeysColorHSV(ledColors, 85, 255, value);
+      if(value >= 180){
+        direction = -1;
+      }else if(value <= 0){
+        direction = 1;
+      }
+      value += direction;
+      break;
+
+    // Spectrum
+    case LEN(colorPalette) + 5:
+      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/15);
+      setAllKeysColorHSV(ledColors, value, 255, 125);
+      if(value >= 179){
+        direction = -1;
+      }else if(value <= 1){
+        direction = 1;
+      }
+      value += direction;
+      break;
+
+    // Rainbow Flow
+    case LEN(colorPalette) + 6:
+      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
+      for(int i = 0; i < NUM_COLUMN; i++){
+        setColumnColorHSV(ledColors, i, values[i], 255, 125);
+        if(values[i] == 179){
+          values[i] = 240;
+        }
+        values[i]++;
+      }
+      break;
+
+    // Rainbow Waterfall
+    case LEN(colorPalette) + 7:
+      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/20);
+      for(int i = 0; i < NUM_ROW; i++){
+        setRowColorHSV(ledColors, i, values[i], 255, 125);
+        if(values[i] == 179){
+          values[i] = 240;
+        }
+        values[i]++;
+      }
+      break;
     
     // Vertical Rainbow Profile
     case 0:
