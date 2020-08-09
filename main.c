@@ -179,11 +179,12 @@ void disableLeds(){
 void ledSet(){
   size_t bytesRead;
   bytesRead = sdReadTimeout(&SD1, commandBuffer, 4, 10000);
-  if (bytesRead < 4)
-    continue;
-  if (commandBuffer[0] >= NUM_ROW || commandBuffer[1] >= NUM_COLUMN)
-    continue;
-  setKeyColor(&ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]], ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]));
+
+  if(bytesRead > 4){
+      if(commandBuffer[0] < NUM_ROW || commandBuffer[1] < NUM_COLUMN){
+          setKeyColor(&ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]], ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]));
+      }
+  }
 }
 
 /*
@@ -192,11 +193,11 @@ void ledSet(){
 void ledSetRow(){
   size_t bytesRead;
   bytesRead = sdReadTimeout(&SD1, commandBuffer, sizeof(uint16_t) * NUM_COLUMN + 1, 1000);
-  if (bytesRead < sizeof(uint16_t) * NUM_COLUMN + 1)
-    continue;
-  if (commandBuffer[0] >= NUM_ROW)
-    continue;
-  memcpy(&ledColors[commandBuffer[0] * NUM_COLUMN],&commandBuffer[1], sizeof(uint16_t) * NUM_COLUMN); 
+  if(bytesRead >= sizeof(uint16_t) * NUM_COLUMN + 1){
+    if(commandBuffer[0] < NUM_ROW){
+      memcpy(&ledColors[commandBuffer[0] * NUM_COLUMN],&commandBuffer[1], sizeof(uint16_t) * NUM_COLUMN); 
+    }
+  }
 }
 
 inline uint8_t min(uint8_t a, uint8_t b){
