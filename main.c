@@ -20,6 +20,7 @@
 #include "string.h"
 #include "ap2_qmk_led.h"
 #include "light_utils.h"
+#include "profiles.h"
 #include "miniFastLED.h"
 
 static void columnCallback(GPTDriver* driver);
@@ -78,7 +79,11 @@ ioline_t ledRows[NUM_ROW * 3] = {
  * Add profiles from source/profiles.h in the profile array
  */
 typedef void (*profile)( led_t* );
-profile profiles[6] = {red, green, blue, rainbowHorizontal, rainbowVertical, animatedRainbow};
+profile profiles[9] = {
+  red, green, blue, rainbowHorizontal, rainbowVertical, 
+  animatedRainbowVertical, animatedRainbowWaterfall, 
+  animatedBreathing, animatedSpectrum
+};
 static uint8_t currentProfile = 0;
 static uint8_t amountOfProfiles = sizeof(profiles)/sizeof(profile);
 
@@ -172,6 +177,7 @@ void disableLeds(){
  * Set a led based on qmk communication
  */
 void ledSet(){
+  size_t bytesRead;
   bytesRead = sdReadTimeout(&SD1, commandBuffer, 4, 10000);
   if (bytesRead < 4)
     continue;
@@ -184,6 +190,7 @@ void ledSet(){
  * Set a row of leds based on qmk communication
  */
 void ledSetRow(){
+  size_t bytesRead;
   bytesRead = sdReadTimeout(&SD1, commandBuffer, sizeof(uint16_t) * NUM_COLUMN + 1, 1000);
   if (bytesRead < sizeof(uint16_t) * NUM_COLUMN + 1)
     continue;
@@ -201,9 +208,21 @@ inline uint8_t min(uint8_t a, uint8_t b){
  */
 void animationCallback(GPTDriver* _driver){
   profile currentFunction = profiles[currentProfile];
-  if(currentFunction == animatedRainbow){
-      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/7);
-      currentFunction(ledColors);
+  if(currentFunction == animatedRainbowVertical){
+    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/5);
+    currentFunction(ledColors);
+  }else if(currentFunction == animatedRainbowWaterfall){
+    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/20);
+    currentFunction(ledColors);
+  }else if(currentFunction == animatedRainbowFlow){
+    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
+    currentFunction(ledColors);
+  }else if(currentFunction == animatedSpectrum){
+    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/15);
+    currentFunction(ledColors);
+  }else if(currentFunction == animatedBreathing){
+    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
+    currentFunction(ledColors);
   }
 }
 
