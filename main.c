@@ -20,10 +20,17 @@
 #include "string.h"
 #include "ap2_qmk_led.h"
 #include "light_utils.h"
+#include "profiles.h"
 #include "miniFastLED.h"
 
 static void columnCallback(GPTDriver* driver);
 static void animationCallback(GPTDriver* driver);
+static void executeMsg(msg_t msg);
+static void switchProfile(void);
+static void executeProfile(void);
+static void disableLeds(void);
+static void ledSet(void);
+static void ledSetRow(void);
 
 
 ioline_t ledColumns[NUM_COLUMN] = {
@@ -67,25 +74,18 @@ ioline_t ledRows[NUM_ROW * 3] = {
 
 #define LEN(a) (sizeof(a)/sizeof(*a))
 
-// An array of basic colors used accross different lighting profiles
-// static const uint32_t colorPalette[] = {0xFF0000, 0xF0F00, 0x00F00, 0x00F0F, 0x0000F, 0xF000F, 0x50F0F};
-static const uint32_t colorPalette[] = {0x9c0000, 0x9c9900, 0x1f9c00, 0x00979c, 0x003e9c, 0x39009c, 0x9c008f};
-
-// The total number of lighting profiles. Each color in the color palette is a static profile of its own + custom ones 
-static const uint16_t NUM_LIGHTING_PROFILES = LEN(colorPalette) + 8;
-
-// Indicates the ID of the current lighting profile
-static uint8_t lightingProfile = 0;
-
-// Column offset for rainbow animation
-static uint8_t colAnimOffset = 0;
-
-// Variables for Breathing and Spectrum Effect
-static uint8_t value = 180;
-static int direction = -1;
-
-// Variables for Rainbow Flow
-static uint8_t values[NUM_COLUMN];
+/*
+ * Active profiles
+ * Add profiles from source/profiles.h in the profile array
+ */
+typedef void (*profile)( led_t* );
+profile profiles[9] = {
+  red, green, blue, rainbowHorizontal, rainbowVertical, 
+  animatedRainbowVertical, animatedRainbowWaterfall, 
+  animatedBreathing, animatedSpectrum
+};
+static uint8_t currentProfile = 0;
+static uint8_t amountOfProfiles = sizeof(profiles)/sizeof(profile);
 
 led_t ledColors[70];
 static uint32_t currentColumn = 0;
@@ -114,121 +114,88 @@ static uint8_t commandBuffer[64];
  */
 THD_WORKING_AREA(waThread1, 128);
 THD_FUNCTION(Thread1, arg) {
-
   (void)arg;
-
-  while (true)
-  {
+    
+  while(true){
     msg_t msg;
-    size_t bytesRead;
     msg = sdGet(&SD1);
-    if (msg >= MSG_OK) {
-      switch (msg) {
-        case CMD_LED_ON:
-          
-          // Disable Interrupts while switching lighting profiles to avoid glitches
-          chSysLock();
+    if(msg >= MSG_OK){
+      executeMsg(msg);
+    }
+  }
+}
 
-          switch(lightingProfile){
+/*
+ * Execute action based on a message
+ */
+void executeMsg(msg_t msg){
+  switch (msg) {
+    case CMD_LED_ON:
+      switchProfile();
+      break;
+    case CMD_LED_OFF:
+      disableLeds();
+      break;
+    case CMD_LED_SET:
+      ledSet();
+      break;
+    case CMD_LED_SET_ROW:
+      ledSetRow();
+      break;
+    default:
+      break;
+  }
+}
 
-            // Horizontal Rainbow Profile
-            case LEN(colorPalette):
-              for (uint16_t i=0; i<NUM_ROW; ++i){
-                for (uint16_t j=0; j<NUM_COLUMN; ++j){
-                  setKeyColor(&ledColors[i*NUM_COLUMN+j], colorPalette[i%LEN(colorPalette)]);
-                }     
-              }
-              break;
+/*
+ * Switch to next profile and execute it
+ */
+void switchProfile(){
+  currentProfile = (currentProfile+1)%amountOfProfiles;
+  executeProfile();
+}
 
-            // Vertical Rainbow Profile
-            case LEN(colorPalette) + 1:
-              for (uint16_t i=0; i<NUM_COLUMN; ++i){
-                for (uint16_t j=0; j<NUM_ROW; ++j){
-                  setKeyColor(&ledColors[j*NUM_COLUMN+i], colorPalette[i%LEN(colorPalette)]);
-                }     
-              }
-              break;
+/*
+ * Execute current profile
+ */
+void executeProfile(){
+  chSysLock();
+  profiles[currentProfile](ledColors);
+  palSetLine(LINE_LED_PWR);
+  chSysUnlock();
+}
 
-            // Miami Nights Profile
-            case LEN(colorPalette) + 2:
-              setAllKeysColor(ledColors, 0x00979c);
-              setModKeysColor(ledColors, 0x9c008f);
-              break;
+/*
+ * Turn off all leds
+ */
+void disableLeds(){
+  currentProfile = (currentProfile+amountOfProfiles-1)%amountOfProfiles;
+  palClearLine(LINE_LED_PWR);
+}
 
-            // Breathing
-            case LEN(colorPalette) + 3:
-              value = 180;
-              direction = -1;
-              setAllKeysColorHSV(ledColors, 125, 255, value);
-              break;
+/*
+ * Set a led based on qmk communication
+ */
+void ledSet(){
+  size_t bytesRead;
+  bytesRead = sdReadTimeout(&SD1, commandBuffer, 4, 10000);
 
-            // Spectrum
-            case LEN(colorPalette) + 4:
-              value = 2;
-              direction = 1;
-              setAllKeysColorHSV(ledColors, value, 255, 125);
-              break;
-
-            // Rainbow Flow
-            case LEN(colorPalette) + 5:
-              // Initialize variables and set initial keyes values
-              for(int i = 0; i < NUM_COLUMN; i++){
-                values[i] = i*11;
-                setColumnColorHSV(ledColors, i, values[i], 255, 120);
-              }
-              break;
-
-            // Rainbow Waterfall
-            case LEN(colorPalette) + 6:
-              // Initialize variables and set initial keyes values
-              for(int i = 0; i < NUM_ROW; i++){
-                values[i] = i*10;
-                setRowColorHSV(ledColors, i, values[i], 255, 120);
-              }
-              break;
-
-            // Animated Rainbow
-            case LEN(colorPalette) + 7:
-              for (uint16_t i=0; i<NUM_COLUMN; ++i){
-                for (uint16_t j=0; j<NUM_ROW; ++j){
-                  setKeyColor(&ledColors[j*NUM_COLUMN+i], colorPalette[i%LEN(colorPalette)]);
-                }     
-              }
-              break;
-
-            // Static Single Color Profiles
-            default:
-              setAllKeysColor(ledColors, colorPalette[lightingProfile]);
-          }
-          palSetLine(LINE_LED_PWR);
-          lightingProfile = (lightingProfile+1)%NUM_LIGHTING_PROFILES;
-
-          // Enable interrupts
-          chSysUnlock();
-          break;
-        case CMD_LED_OFF:
-          lightingProfile = (lightingProfile+LEN(colorPalette)-1)%LEN(colorPalette);
-          palClearLine(LINE_LED_PWR);
-          break;
-        case CMD_LED_SET:
-          bytesRead = sdReadTimeout(&SD1, commandBuffer, 4, 10000);
-          if (bytesRead < 4)
-            continue;
-          if (commandBuffer[0] >= NUM_ROW || commandBuffer[1] >= NUM_COLUMN)
-            continue;
+  if(bytesRead >= 4){
+      if(commandBuffer[0] < NUM_ROW || commandBuffer[1] < NUM_COLUMN){
           setKeyColor(&ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]], ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]));
-          break;
-        case CMD_LED_SET_ROW:
-          bytesRead = sdReadTimeout(&SD1, commandBuffer, sizeof(uint16_t) * NUM_COLUMN + 1, 1000);
-          if (bytesRead < sizeof(uint16_t) * NUM_COLUMN + 1)
-            continue;
-          if (commandBuffer[0] >= NUM_ROW)
-            continue;
-          memcpy(&ledColors[commandBuffer[0] * NUM_COLUMN],&commandBuffer[1], sizeof(uint16_t) * NUM_COLUMN);
-          break;
-        default:
-          break;
       }
+  }
+}
+
+/*
+ * Set a row of leds based on qmk communication
+ */
+void ledSetRow(){
+  size_t bytesRead;
+  bytesRead = sdReadTimeout(&SD1, commandBuffer, sizeof(uint16_t) * NUM_COLUMN + 1, 1000);
+  if(bytesRead >= sizeof(uint16_t) * NUM_COLUMN + 1){
+    if(commandBuffer[0] < NUM_ROW){
+      memcpy(&ledColors[commandBuffer[0] * NUM_COLUMN],&commandBuffer[1], sizeof(uint16_t) * NUM_COLUMN); 
     }
   }
 }
@@ -237,73 +204,26 @@ inline uint8_t min(uint8_t a, uint8_t b){
   return a<=b?a:b;
 }
 
-// Update lighting table as per animation
+/*
+ * Update lighting table as per animation
+ */
 void animationCallback(GPTDriver* _driver){
-  
-  // Update lighting according to the current lighting profile
-  switch(lightingProfile){
-
-    // Breathing
-    case LEN(colorPalette) + 4:
-      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
-      setAllKeysColorHSV(ledColors, 85, 255, value);
-      if(value >= 180){
-        direction = -1;
-      }else if(value <= 0){
-        direction = 1;
-      }
-      value += direction;
-      break;
-
-    // Spectrum
-    case LEN(colorPalette) + 5:
-      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/15);
-      setAllKeysColorHSV(ledColors, value, 255, 125);
-      if(value >= 179){
-        direction = -1;
-      }else if(value <= 1){
-        direction = 1;
-      }
-      value += direction;
-      break;
-
-    // Rainbow Flow
-    case LEN(colorPalette) + 6:
-      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
-      for(int i = 0; i < NUM_COLUMN; i++){
-        setColumnColorHSV(ledColors, i, values[i], 255, 125);
-        if(values[i] == 179){
-          values[i] = 240;
-        }
-        values[i]++;
-      }
-      break;
-
-    // Rainbow Waterfall
-    case LEN(colorPalette) + 7:
-      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/20);
-      for(int i = 0; i < NUM_ROW; i++){
-        setRowColorHSV(ledColors, i, values[i], 255, 125);
-        if(values[i] == 179){
-          values[i] = 240;
-        }
-        values[i]++;
-      }
-      break;
-    
-    // Vertical Rainbow Profile
-    case 0:
-      // Set refresh rate for this animation
-      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/5);
-      // Update led colors
-      for (uint16_t i=0; i<NUM_COLUMN; ++i){
-        for (uint16_t j=0; j<NUM_ROW; ++j){
-          setKeyColor(&ledColors[j*NUM_COLUMN+i], colorPalette[(i + colAnimOffset)%LEN(colorPalette)]);
-        }     
-      }
-      colAnimOffset = (colAnimOffset + 1)%LEN(colorPalette);
-      break;
-
+  profile currentFunction = profiles[currentProfile];
+  if(currentFunction == animatedRainbowVertical){
+    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/5);
+    currentFunction(ledColors);
+  }else if(currentFunction == animatedRainbowWaterfall){
+    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/20);
+    currentFunction(ledColors);
+  }else if(currentFunction == animatedRainbowFlow){
+    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
+    currentFunction(ledColors);
+  }else if(currentFunction == animatedSpectrum){
+    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/15);
+    currentFunction(ledColors);
+  }else if(currentFunction == animatedBreathing){
+    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
+    currentFunction(ledColors);
   }
 }
 
