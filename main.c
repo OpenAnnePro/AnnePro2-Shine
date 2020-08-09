@@ -30,7 +30,7 @@ void switchProfile(void);
 void executeProfile(void);
 void disableLeds(void);
 void ledSet(void);
-void ledRowSet(void);
+void ledSetRow(void);
 
 
 ioline_t ledColumns[NUM_COLUMN] = {
