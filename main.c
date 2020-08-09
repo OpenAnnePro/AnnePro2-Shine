@@ -73,7 +73,6 @@ ioline_t ledRows[NUM_ROW * 3] = {
 
 #define LEN(a) (sizeof(a)/sizeof(*a))
 
-
 /*
  * Active profiles
  * Add profiles from source/profiles.h in the profile array
@@ -169,6 +168,9 @@ void disableLeds(){
   palClearLine(LINE_LED_PWR);
 }
 
+/*
+ * Set a led based on qmk communication
+ */
 void ledSet(){
   bytesRead = sdReadTimeout(&SD1, commandBuffer, 4, 10000);
   if (bytesRead < 4)
@@ -178,6 +180,9 @@ void ledSet(){
   setKeyColor(&ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]], ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]));
 }
 
+/*
+ * Set a row of leds based on qmk communication
+ */
 void ledSetRow(){
   bytesRead = sdReadTimeout(&SD1, commandBuffer, sizeof(uint16_t) * NUM_COLUMN + 1, 1000);
   if (bytesRead < sizeof(uint16_t) * NUM_COLUMN + 1)
@@ -191,7 +196,9 @@ inline uint8_t min(uint8_t a, uint8_t b){
   return a<=b?a:b;
 }
 
-// Update lighting table as per animation
+/*
+ * Update lighting table as per animation
+ */
 void animationCallback(GPTDriver* _driver){
   profile currentFunction = profiles[currentProfile];
   if(currentFunction == animatedRainbow){
