@@ -156,7 +156,7 @@ void switchProfile(){
  */
 void executeProfile(){
   chSysLock();
-  profiles[currentProfile](currentKeyLedColors);
+  profiles[currentProfile](ledColors);
   palSetLine(LINE_LED_PWR);
   chSysUnlock();
 }
@@ -193,71 +193,10 @@ inline uint8_t min(uint8_t a, uint8_t b){
 
 // Update lighting table as per animation
 void animationCallback(GPTDriver* _driver){
-  
-  // Update lighting according to the current lighting profile
-  switch(lightingProfile){
-
-    // Breathing
-    case LEN(colorPalette) + 4:
-      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
-      setAllKeysColorHSV(ledColors, 85, 255, value);
-      if(value >= 180){
-        direction = -1;
-      }else if(value <= 0){
-        direction = 1;
-      }
-      value += direction;
-      break;
-
-    // Spectrum
-    case LEN(colorPalette) + 5:
-      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/15);
-      setAllKeysColorHSV(ledColors, value, 255, 125);
-      if(value >= 179){
-        direction = -1;
-      }else if(value <= 1){
-        direction = 1;
-      }
-      value += direction;
-      break;
-
-    // Rainbow Flow
-    case LEN(colorPalette) + 6:
-      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
-      for(int i = 0; i < NUM_COLUMN; i++){
-        setColumnColorHSV(ledColors, i, values[i], 255, 125);
-        if(values[i] == 179){
-          values[i] = 240;
-        }
-        values[i]++;
-      }
-      break;
-
-    // Rainbow Waterfall
-    case LEN(colorPalette) + 7:
-      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/20);
-      for(int i = 0; i < NUM_ROW; i++){
-        setRowColorHSV(ledColors, i, values[i], 255, 125);
-        if(values[i] == 179){
-          values[i] = 240;
-        }
-        values[i]++;
-      }
-      break;
-    
-    // Vertical Rainbow Profile
-    case 0:
-      // Set refresh rate for this animation
-      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/5);
-      // Update led colors
-      for (uint16_t i=0; i<NUM_COLUMN; ++i){
-        for (uint16_t j=0; j<NUM_ROW; ++j){
-          setKeyColor(&ledColors[j*NUM_COLUMN+i], colorPalette[(i + colAnimOffset)%LEN(colorPalette)]);
-        }     
-      }
-      colAnimOffset = (colAnimOffset + 1)%LEN(colorPalette);
-      break;
-
+  profile currentFunction = profiles[currentProfile];
+  if(currentFunction == animatedRainbow){
+      gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/7);
+      currentFunction(ledColors);
   }
 }
 
