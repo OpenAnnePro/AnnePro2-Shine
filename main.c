@@ -180,7 +180,7 @@ void ledSet(){
   size_t bytesRead;
   bytesRead = sdReadTimeout(&SD1, commandBuffer, 4, 10000);
 
-  if(bytesRead > 4){
+  if(bytesRead >= 4){
       if(commandBuffer[0] < NUM_ROW || commandBuffer[1] < NUM_COLUMN){
           setKeyColor(&ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]], ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]));
       }
