@@ -67,25 +67,15 @@ ioline_t ledRows[NUM_ROW * 3] = {
 
 #define LEN(a) (sizeof(a)/sizeof(*a))
 
-// An array of basic colors used accross different lighting profiles
-// static const uint32_t colorPalette[] = {0xFF0000, 0xF0F00, 0x00F00, 0x00F0F, 0x0000F, 0xF000F, 0x50F0F};
-static const uint32_t colorPalette[] = {0x9c0000, 0x9c9900, 0x1f9c00, 0x00979c, 0x003e9c, 0x39009c, 0x9c008f};
 
-// The total number of lighting profiles. Each color in the color palette is a static profile of its own + custom ones 
-static const uint16_t NUM_LIGHTING_PROFILES = LEN(colorPalette) + 8;
-
-// Indicates the ID of the current lighting profile
-static uint8_t lightingProfile = 0;
-
-// Column offset for rainbow animation
-static uint8_t colAnimOffset = 0;
-
-// Variables for Breathing and Spectrum Effect
-static uint8_t value = 180;
-static int direction = -1;
-
-// Variables for Rainbow Flow
-static uint8_t values[NUM_COLUMN];
+/*
+ * Active profiles
+ * Add profiles from source/profiles.h in the profile array
+ */
+typedef void (*profile)( led_t* );
+profile profiles[6] = {red, green, blue, rainbowHorizontal, rainbowVertical, animatedRainbow};
+static uint8_t currentProfile = 0;
+static uint8_t amountOfProfiles = sizeof(profiles)/sizeof(profile);
 
 led_t ledColors[70];
 static uint32_t currentColumn = 0;
