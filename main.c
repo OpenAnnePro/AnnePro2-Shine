@@ -25,12 +25,12 @@
 
 static void columnCallback(GPTDriver* driver);
 static void animationCallback(GPTDriver* driver);
-void executeMsg(msg_t msg);
-void switchProfile(void);
-void executeProfile(void);
-void disableLeds(void);
-void ledSet(void);
-void ledSetRow(void);
+static void executeMsg(msg_t msg);
+static void switchProfile(void);
+static void executeProfile(void);
+static void disableLeds(void);
+static void ledSet(void);
+static void ledSetRow(void);
 
 
 ioline_t ledColumns[NUM_COLUMN] = {
