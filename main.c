@@ -24,6 +24,12 @@
 
 static void columnCallback(GPTDriver* driver);
 static void animationCallback(GPTDriver* driver);
+void executeMsg(msg_t msg);
+void switchProfile(void);
+void executeProfile(void);
+void disableLeds(void);
+void ledSet(void);
+void ledRowSet(void);
 
 
 ioline_t ledColumns[NUM_COLUMN] = {
@@ -104,123 +110,81 @@ static uint8_t commandBuffer[64];
  */
 THD_WORKING_AREA(waThread1, 128);
 THD_FUNCTION(Thread1, arg) {
-
   (void)arg;
-
-  while (true)
-  {
+    
+  while(true){
     msg_t msg;
-    size_t bytesRead;
     msg = sdGet(&SD1);
-    if (msg >= MSG_OK) {
-      switch (msg) {
-        case CMD_LED_ON:
-          
-          // Disable Interrupts while switching lighting profiles to avoid glitches
-          chSysLock();
-
-          switch(lightingProfile){
-
-            // Horizontal Rainbow Profile
-            case LEN(colorPalette):
-              for (uint16_t i=0; i<NUM_ROW; ++i){
-                for (uint16_t j=0; j<NUM_COLUMN; ++j){
-                  setKeyColor(&ledColors[i*NUM_COLUMN+j], colorPalette[i%LEN(colorPalette)]);
-                }     
-              }
-              break;
-
-            // Vertical Rainbow Profile
-            case LEN(colorPalette) + 1:
-              for (uint16_t i=0; i<NUM_COLUMN; ++i){
-                for (uint16_t j=0; j<NUM_ROW; ++j){
-                  setKeyColor(&ledColors[j*NUM_COLUMN+i], colorPalette[i%LEN(colorPalette)]);
-                }     
-              }
-              break;
-
-            // Miami Nights Profile
-            case LEN(colorPalette) + 2:
-              setAllKeysColor(ledColors, 0x00979c);
-              setModKeysColor(ledColors, 0x9c008f);
-              break;
-
-            // Breathing
-            case LEN(colorPalette) + 3:
-              value = 180;
-              direction = -1;
-              setAllKeysColorHSV(ledColors, 125, 255, value);
-              break;
-
-            // Spectrum
-            case LEN(colorPalette) + 4:
-              value = 2;
-              direction = 1;
-              setAllKeysColorHSV(ledColors, value, 255, 125);
-              break;
-
-            // Rainbow Flow
-            case LEN(colorPalette) + 5:
-              // Initialize variables and set initial keyes values
-              for(int i = 0; i < NUM_COLUMN; i++){
-                values[i] = i*11;
-                setColumnColorHSV(ledColors, i, values[i], 255, 120);
-              }
-              break;
-
-            // Rainbow Waterfall
-            case LEN(colorPalette) + 6:
-              // Initialize variables and set initial keyes values
-              for(int i = 0; i < NUM_ROW; i++){
-                values[i] = i*10;
-                setRowColorHSV(ledColors, i, values[i], 255, 120);
-              }
-              break;
-
-            // Animated Rainbow
-            case LEN(colorPalette) + 7:
-              for (uint16_t i=0; i<NUM_COLUMN; ++i){
-                for (uint16_t j=0; j<NUM_ROW; ++j){
-                  setKeyColor(&ledColors[j*NUM_COLUMN+i], colorPalette[i%LEN(colorPalette)]);
-                }     
-              }
-              break;
-
-            // Static Single Color Profiles
-            default:
-              setAllKeysColor(ledColors, colorPalette[lightingProfile]);
-          }
-          palSetLine(LINE_LED_PWR);
-          lightingProfile = (lightingProfile+1)%NUM_LIGHTING_PROFILES;
-
-          // Enable interrupts
-          chSysUnlock();
-          break;
-        case CMD_LED_OFF:
-          lightingProfile = (lightingProfile+LEN(colorPalette)-1)%LEN(colorPalette);
-          palClearLine(LINE_LED_PWR);
-          break;
-        case CMD_LED_SET:
-          bytesRead = sdReadTimeout(&SD1, commandBuffer, 4, 10000);
-          if (bytesRead < 4)
-            continue;
-          if (commandBuffer[0] >= NUM_ROW || commandBuffer[1] >= NUM_COLUMN)
-            continue;
-          setKeyColor(&ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]], ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]));
-          break;
-        case CMD_LED_SET_ROW:
-          bytesRead = sdReadTimeout(&SD1, commandBuffer, sizeof(uint16_t) * NUM_COLUMN + 1, 1000);
-          if (bytesRead < sizeof(uint16_t) * NUM_COLUMN + 1)
-            continue;
-          if (commandBuffer[0] >= NUM_ROW)
-            continue;
-          memcpy(&ledColors[commandBuffer[0] * NUM_COLUMN],&commandBuffer[1], sizeof(uint16_t) * NUM_COLUMN);
-          break;
-        default:
-          break;
-      }
+    if(msg >= MSG_OK){
+      executeMsg(msg);
     }
   }
+}
+
+/*
+ * Execute action based on a message
+ */
+void executeMsg(msg_t msg){
+  switch (msg) {
+    case CMD_LED_ON:
+      switchProfile();
+      break;
+    case CMD_LED_OFF:
+      disableLeds();
+      break;
+    case CMD_LED_SET:
+      ledSet();
+      break;
+    case CMD_LED_SET_ROW:
+      ledSetRow();
+      break;
+    default:
+      break;
+  }
+}
+
+/*
+ * Switch to next profile and execute it
+ */
+void switchProfile(){
+  currentProfile = (currentProfile+1)%amountOfProfiles;
+  executeProfile();
+}
+
+/*
+ * Execute current profile
+ */
+void executeProfile(){
+  chSysLock();
+  profiles[currentProfile](currentKeyLedColors);
+  palSetLine(LINE_LED_PWR);
+  chSysUnlock();
+}
+
+/*
+ * Turn off all leds
+ */
+void disableLeds(){
+  currentProfile = (currentProfile+amountOfProfiles-1)%amountOfProfiles;
+  palClearLine(LINE_LED_PWR);
+}
+
+void ledSet(){
+  bytesRead = sdReadTimeout(&SD1, commandBuffer, 4, 10000);
+  if (bytesRead < 4)
+    continue;
+  if (commandBuffer[0] >= NUM_ROW || commandBuffer[1] >= NUM_COLUMN)
+    continue;
+  setKeyColor(&ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]], ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]));
+}
+
+void ledSetRow(){
+  bytesRead = sdReadTimeout(&SD1, commandBuffer, sizeof(uint16_t) * NUM_COLUMN + 1, 1000);
+  if (bytesRead < sizeof(uint16_t) * NUM_COLUMN + 1)
+    continue;
+  if (commandBuffer[0] >= NUM_ROW)
+    continue;
+  memcpy(&ledColors[commandBuffer[0] * NUM_COLUMN],&commandBuffer[1], sizeof(uint16_t) * NUM_COLUMN); 
 }
 
 inline uint8_t min(uint8_t a, uint8_t b){
