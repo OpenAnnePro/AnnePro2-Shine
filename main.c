@@ -114,9 +114,9 @@ static uint8_t commandBuffer[64];
  * Thread 1.
  */
 THD_WORKING_AREA(waThread1, 128);
-THD_FUNCTION(Thread1, arg) {
+_Noreturn THD_FUNCTION(Thread1, arg) {
   (void)arg;
-    
+
   while(true){
     msg_t msg;
     msg = sdGet(&SD1);
@@ -153,6 +153,12 @@ void executeMsg(msg_t msg){
     case CMD_LED_PREV_PROFILE:
       currentProfile = (currentProfile-1)%amountOfProfiles;
       executeProfile();
+      break;
+    case CMD_LED_GET_PROFILE:
+      sdWrite(&SD1, &currentProfile, 1);
+      break;
+    case CMD_LED_GET_NUM_PROFILES:
+      sdWrite(&SD1, &amountOfProfiles, 1);
       break;
     default:
       break;

@@ -7,3 +7,5 @@
 #define CMD_LED_SET_PROFILE                 0x5
 #define CMD_LED_NEXT_PROFILE                0x6
 #define CMD_LED_PREV_PROFILE                0x7
+#define CMD_LED_GET_PROFILE                 0x8
+#define CMD_LED_GET_NUM_PROFILES            0x9
