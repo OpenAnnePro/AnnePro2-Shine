@@ -114,7 +114,7 @@ static uint8_t commandBuffer[64];
  * Thread 1.
  */
 THD_WORKING_AREA(waThread1, 128);
-_Noreturn THD_FUNCTION(Thread1, arg) {
+__attribute__((noreturn)) THD_FUNCTION(Thread1, arg) {
   (void)arg;
 
   while(true){
@@ -207,7 +207,6 @@ void executeProfile(){
  * Turn off all leds
  */
 void disableLeds(){
-  // currentProfile = (currentProfile+amountOfProfiles-1)%amountOfProfiles;
   palClearLine(LINE_LED_PWR);
 }
 
@@ -314,7 +313,6 @@ int main(void) {
   halInit();
   chSysInit();
 
-  // Setup UART1
   profiles[currentProfile](ledColors);
   palClearLine(LINE_LED_PWR);
   sdStart(&SD1, &usart1Config);
