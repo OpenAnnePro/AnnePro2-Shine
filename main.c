@@ -31,6 +31,7 @@ static void executeProfile(void);
 static void disableLeds(void);
 static void ledSet(void);
 static void ledSetRow(void);
+static void setProfile(void);
 
 
 ioline_t ledColumns[NUM_COLUMN] = {
@@ -113,9 +114,9 @@ static uint8_t commandBuffer[64];
  * Thread 1.
  */
 THD_WORKING_AREA(waThread1, 128);
-THD_FUNCTION(Thread1, arg) {
+__attribute__((noreturn)) THD_FUNCTION(Thread1, arg) {
   (void)arg;
-    
+
   while(true){
     msg_t msg;
     msg = sdGet(&SD1);
@@ -131,7 +132,7 @@ THD_FUNCTION(Thread1, arg) {
 void executeMsg(msg_t msg){
   switch (msg) {
     case CMD_LED_ON:
-      switchProfile();
+      executeProfile();
       break;
     case CMD_LED_OFF:
       disableLeds();
@@ -142,9 +143,46 @@ void executeMsg(msg_t msg){
     case CMD_LED_SET_ROW:
       ledSetRow();
       break;
+    case CMD_LED_SET_PROFILE:
+      setProfile();
+      break;
+    case CMD_LED_NEXT_PROFILE:
+      currentProfile = (currentProfile+1)%amountOfProfiles;
+      executeProfile();
+      break;
+    case CMD_LED_PREV_PROFILE:
+      currentProfile = (currentProfile-1)%amountOfProfiles;
+      executeProfile();
+      break;
+    case CMD_LED_GET_PROFILE:
+      sdWrite(&SD1, &currentProfile, 1);
+      break;
+    case CMD_LED_GET_NUM_PROFILES:
+      sdWrite(&SD1, &amountOfProfiles, 1);
+      break;
     default:
       break;
   }
+}
+
+
+/*
+ * Set profile and execute it
+ */
+void setProfile(){
+  size_t bytesRead;
+  bytesRead = sdReadTimeout(&SD1, commandBuffer, 1, 10000);
+
+  if(bytesRead == 1){
+    if(commandBuffer[0] < amountOfProfiles){
+      currentProfile = commandBuffer[0];
+    }
+  }
+
+  // set colors without turning on leds (if we have a saved profile off by default in eeprom)
+  chSysLock();
+  profiles[currentProfile](ledColors);
+  chSysUnlock();
 }
 
 /*
@@ -169,7 +207,6 @@ void executeProfile(){
  * Turn off all leds
  */
 void disableLeds(){
-  currentProfile = (currentProfile+amountOfProfiles-1)%amountOfProfiles;
   palClearLine(LINE_LED_PWR);
 }
 
@@ -276,9 +313,9 @@ int main(void) {
   halInit();
   chSysInit();
 
-  // Setup UART1
+  profiles[currentProfile](ledColors);
+  palClearLine(LINE_LED_PWR);
   sdStart(&SD1, &usart1Config);
-  palSetLine(LINE_LED_PWR);
 
   // Setup Column Multiplex Timer
   gptStart(&GPTD_BFTM0, &bftm0Config);
@@ -293,6 +330,7 @@ int main(void) {
      task but you must never try to sleep or wait in this loop. Note that
      this tasks runs at the lowest priority level so any instruction added
      here will be executed after all other tasks have been started.*/
+
   while (true) {
   }
 }
