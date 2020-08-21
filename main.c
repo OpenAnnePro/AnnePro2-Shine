@@ -29,6 +29,7 @@ static void executeMsg(msg_t msg);
 static void switchProfile(void);
 static void executeProfile(void);
 static void disableLeds(void);
+static void enableLeds(void);
 static void ledSet(void);
 static void ledSetRow(void);
 static void setProfile(void);
@@ -132,7 +133,7 @@ __attribute__((noreturn)) THD_FUNCTION(Thread1, arg) {
 void executeMsg(msg_t msg){
   switch (msg) {
     case CMD_LED_ON:
-      executeProfile();
+      enableLeds();
       break;
     case CMD_LED_OFF:
       disableLeds();
@@ -151,7 +152,7 @@ void executeMsg(msg_t msg){
       executeProfile();
       break;
     case CMD_LED_PREV_PROFILE:
-      currentProfile = (currentProfile-1)%amountOfProfiles;
+      currentProfile = (currentProfile-1u)%amountOfProfiles;
       executeProfile();
       break;
     case CMD_LED_GET_PROFILE:
@@ -199,7 +200,6 @@ void switchProfile(){
 void executeProfile(){
   chSysLock();
   profiles[currentProfile](ledColors);
-  palSetLine(LINE_LED_PWR);
   chSysUnlock();
 }
 
@@ -208,6 +208,13 @@ void executeProfile(){
  */
 void disableLeds(){
   palClearLine(LINE_LED_PWR);
+}
+
+/*
+ * Turn on all leds
+ */
+void enableLeds(){
+  palSetLine(LINE_LED_PWR);
 }
 
 /*
