@@ -152,7 +152,7 @@ void executeMsg(msg_t msg){
       executeProfile();
       break;
     case CMD_LED_PREV_PROFILE:
-      currentProfile = (currentProfile-1u)%amountOfProfiles;
+      currentProfile = (currentProfile+(amountOfProfiles-1u))%amountOfProfiles;
       executeProfile();
       break;
     case CMD_LED_GET_PROFILE:
