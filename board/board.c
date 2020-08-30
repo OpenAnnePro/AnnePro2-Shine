@@ -23,6 +23,7 @@
 
 /* ============ Function Prototypes ================== */
 #define PBIT(PORT, LINE) ((PAL_PORT(LINE) == PORT) ? (1 << PAL_PAD(LINE)) : 0)
+#define P2BVAL(PORT, LINE, VAL) ((PAL_PORT(LINE) == PORT) ? (VAL << (PAL_PAD(LINE) << 1)) : 0)
 #define PAFIO_L(PORT, LINE, AF) (((PAL_PORT(LINE) == PORT) && (PAL_PAD(LINE) < 8)) ? (AF << (PAL_PAD(LINE) << 2)) : 0)
 #define PAFIO_H(PORT, LINE, AF) (((PAL_PORT(LINE) == PORT) && (PAL_PAD(LINE) >= 8)) ? (AF << ((PAL_PAD(LINE) - 8) << 2)) : 0)
 #define PAFIO(PORT, N, LINE, AF) ((N) ? PAFIO_H(PORT, LINE, AF) : PAFIO_L(PORT, LINE, AF))
@@ -62,6 +63,38 @@
 
 #define IN_BITS(PORT) (\
 0)
+
+#define HIGH_CURRENT_BITS(PORT) (\
+    P2BVAL(PORT, LINE_LED_COL_1 , 0b11) |\
+    P2BVAL(PORT, LINE_LED_COL_2 , 0b11) |\
+    P2BVAL(PORT, LINE_LED_COL_3 , 0b11) |\
+    P2BVAL(PORT, LINE_LED_COL_4 , 0b11) |\
+    P2BVAL(PORT, LINE_LED_COL_5 , 0b11) |\
+    P2BVAL(PORT, LINE_LED_COL_6 , 0b11) |\
+    P2BVAL(PORT, LINE_LED_COL_7 , 0b11) |\
+    P2BVAL(PORT, LINE_LED_COL_8 , 0b11) |\
+    P2BVAL(PORT, LINE_LED_COL_9 , 0b11) |\
+    P2BVAL(PORT, LINE_LED_COL_10, 0b11) |\
+    P2BVAL(PORT, LINE_LED_COL_11, 0b11) |\
+    P2BVAL(PORT, LINE_LED_COL_12, 0b11) |\
+    P2BVAL(PORT, LINE_LED_COL_13, 0b11) |\
+    P2BVAL(PORT, LINE_LED_COL_14, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_1_R, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_1_G, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_1_B, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_2_R, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_2_G, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_2_B, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_3_R, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_3_G, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_3_B, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_4_R, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_4_G, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_4_B, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_5_R, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_5_G, 0b11) |\
+    P2BVAL(PORT, LINE_LED_ROW_5_B, 0b11) |\
+0U)
 
 // Alternate Functions
 #define AF_BITS(PORT, N) (\
@@ -114,7 +147,7 @@ const PALConfig pal_default_config = {
         .PU = IN_BITS(IOPORTA),
         .PD = 0x0000,
         .OD = 0x0000,
-        .DRV = 0x0000,
+        .DRV = HIGH_CURRENT_BITS(IOPORTA),
         .LOCK = 0x0000,
         .OUT = 0x0000,
         .CFG[0] = AF_BITS(IOPORTA, 0),
@@ -127,7 +160,7 @@ const PALConfig pal_default_config = {
         .PU = IN_BITS(IOPORTB),
         .PD = 0x0000,
         .OD = 0x0000,
-        .DRV = 0x0000,
+        .DRV = HIGH_CURRENT_BITS(IOPORTB),
         .LOCK = 0x0000,
         .OUT = 0x0000,
         .CFG[0] = AF_BITS(IOPORTB, 0),
@@ -140,7 +173,7 @@ const PALConfig pal_default_config = {
         .PU = IN_BITS(IOPORTC),
         .PD = 0x0000,
         .OD = 0x0000,
-        .DRV = 0x0000,
+        .DRV = HIGH_CURRENT_BITS(IOPORTC),
         .LOCK = 0x0000,
         .OUT = 0x0000,
         .CFG[0] = AF_BITS(IOPORTC, 0),
@@ -153,7 +186,7 @@ const PALConfig pal_default_config = {
         .PU = IN_BITS(IOPORTD),
         .PD = 0x0000,
         .OD = 0x0000,
-        .DRV = 0x0000,
+        .DRV = HIGH_CURRENT_BITS(IOPORTD),
         .LOCK = 0x0000,
         .OUT = 0x0000,
         .CFG[0] = AF_BITS(IOPORTD, 0),

@@ -9,3 +9,5 @@
 #define CMD_LED_PREV_PROFILE                0x7
 #define CMD_LED_GET_PROFILE                 0x8
 #define CMD_LED_GET_NUM_PROFILES            0x9
+#define CMD_LED_SET_MASK                    0xA
+#define CMD_LED_CLEAR_MASK                  0xB
