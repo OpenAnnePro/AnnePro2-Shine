@@ -10,16 +10,21 @@ but it provides the flexibility for creating custom effects.
 
 **Warning: This will not work with the Obins Stock firmware**
 
-To build simply type 
-```bash
-make
-```
-or
-```bash
-make MODEL=C18
-```
-if you have the C18 revision.
+To build both C15 and C18 versions run
 
+`make`
+
+to build just C15 run
+
+`make C15`
+
+to build just C18 run
+
+`make C18`
+
+The resulting `.bin` files will be in the `build` directory
+named `annepro2-shine-C15.bin` and `annepro2-shine-C18.bin`
+respectively
 
 # Contribute
 
