@@ -5,16 +5,12 @@
 
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -O2 -ggdb -fomit-frame-pointer -falign-functions=16
-endif
-
-ifeq ($(MODEL), C18)
-  USE_OPT += -DC18
+  USE_OPT = -O2 -ggdb -fomit-frame-pointer -falign-functions=16 -Wno-cpp -DHAL_USE_COMMUNITY
 endif
 
 # C specific options here (added to USE_OPT).
 ifeq ($(USE_COPT),)
-  USE_COPT = 
+  USE_COPT =
 endif
 
 # C++ specific options here (added to USE_OPT).
@@ -29,7 +25,7 @@ endif
 
 # Linker extra options here.
 ifeq ($(USE_LDOPT),)
-  USE_LDOPT = 
+  USE_LDOPT =
 endif
 
 # Enable this if you want link time optimizations (LTO).
@@ -85,9 +81,6 @@ endif
 ##############################################################################
 # Project, target, sources and paths
 #
-
-# Define project name here
-PROJECT = annepro2-shine
 
 # Target settings.
 MCU  = cortex-m0plus
@@ -164,6 +157,27 @@ ULIBDIR =
 
 # List all user libraries here
 ULIBS =
+
+ifeq "$(strip $(filter C15,$(MAKECMDGOALS)))" "C15"
+BUILDDIR = build/C15
+PROJECT = annepro2-shine-C15
+endif
+ifeq "$(strip $(filter C18,$(MAKECMDGOALS)))" "C18"
+BUILDDIR = build/C18
+PROJECT = annepro2-shine-C18
+endif
+
+.PHONY: default
+default:
+	$(MAKE) C18
+	$(MAKE) C15
+
+C15: all
+	@cp $(BUILDDIR)/$(PROJECT).bin build/$(PROJECT).bin
+
+C18: CFLAGS += -DC18
+C18: all
+	@cp $(BUILDDIR)/$(PROJECT).bin build/$(PROJECT).bin
 
 #
 # End of user section
