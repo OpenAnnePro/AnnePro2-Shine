@@ -86,10 +86,10 @@ ioline_t ledRows[NUM_ROW * 4] = {
  * Add profiles from source/profiles.h in the profile array
  */
 typedef void (*profile)( led_t* );
-profile profiles[10] = {
+profile profiles[11] = {
   red, green, blue, rainbowHorizontal, rainbowVertical, 
   animatedRainbowVertical, animatedRainbowFlow, animatedRainbowWaterfall, 
-  animatedBreathing, animatedSpectrum
+  animatedBreathing, animatedWave, animatedSpectrum
 };
 static uint8_t currentProfile = 0;
 static uint8_t amountOfProfiles = sizeof(profiles)/sizeof(profile);
@@ -290,6 +290,9 @@ void animationCallback(GPTDriver* _driver){
     currentFunction(ledColors);
   }else if(currentFunction == animatedBreathing){
     gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
+    currentFunction(ledColors);
+  }else if(currentFunction == animatedWave){
+    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/60);
     currentFunction(ledColors);
   }
 }

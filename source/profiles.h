@@ -18,3 +18,4 @@ void animatedRainbowFlow(led_t* currentKeyLedColors);
 void animatedRainbowWaterfall(led_t* currentKeyLedColors);
 void animatedBreathing(led_t* currentKeyLedColors);
 void animatedSpectrum(led_t* currentKeyLedColors);
+void animatedWave(led_t* currentKeyLedColors);
