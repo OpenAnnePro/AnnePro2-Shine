@@ -103,22 +103,22 @@ void hsv2rgb(uint8_t hue, uint8_t sat, uint8_t val, uint8_t* rgbResults){
 }
 
 // Set all keys to HSV color
-void setAllKeysColorHSV(led_t* ledColors, uint8_t hue, uint8_t sat, uint8_t val){
+void setAllKeysColorHSV(led_t* ledColors, uint8_t hue, uint8_t sat, uint8_t val, uint8_t intensity){
 
     // Convert hsv to rgb
     hsv2rgb(hue, sat, val, rgbArray);
 
     // Set key colors
     for (uint16_t i=0; i<NUM_COLUMN * NUM_ROW; ++i){
-        ledColors[i].red = rgbArray[0];
-        ledColors[i].green = rgbArray[1];
-        ledColors[i].blue = rgbArray[2];
+        ledColors[i].red = rgbArray[0] >> intensity;
+        ledColors[i].green = rgbArray[1] >> intensity;
+        ledColors[i].blue = rgbArray[2] >> intensity;
     }
 
 }
 
 // Set all keys to HSV color
-void setColumnColorHSV(led_t* ledColors, uint8_t column, uint8_t hue, uint8_t sat, uint8_t val){
+void setColumnColorHSV(led_t* ledColors, uint8_t column, uint8_t hue, uint8_t sat, uint8_t val, uint8_t intensity){
 
     // Convert hsv to rgb
     hsv2rgb(hue, sat, val, rgbArray);
@@ -126,15 +126,15 @@ void setColumnColorHSV(led_t* ledColors, uint8_t column, uint8_t hue, uint8_t sa
     // Set column key color
     for (uint16_t i=0; i< NUM_ROW; ++i){
         // section 1: 0x40..0x7F
-        ledColors[i * NUM_COLUMN + column].red = rgbArray[0];
-        ledColors[i * NUM_COLUMN + column].green = rgbArray[1];
-        ledColors[i * NUM_COLUMN + column].blue = rgbArray[2];
+        ledColors[i * NUM_COLUMN + column].red = rgbArray[0] >> intensity;
+        ledColors[i * NUM_COLUMN + column].green = rgbArray[1] >> intensity;
+        ledColors[i * NUM_COLUMN + column].blue = rgbArray[2] >> intensity;
     }
 
 }
 
 // Set column to HSV color
-void setRowColorHSV(led_t* ledColors, uint8_t row, uint8_t hue, uint8_t sat, uint8_t val){
+void setRowColorHSV(led_t* ledColors, uint8_t row, uint8_t hue, uint8_t sat, uint8_t val, uint8_t intensity){
 
     // Convert hsv to rgb
     hsv2rgb(hue, sat, val, rgbArray);
@@ -142,10 +142,9 @@ void setRowColorHSV(led_t* ledColors, uint8_t row, uint8_t hue, uint8_t sat, uin
     // Set column key color
     for (uint16_t i=0; i< NUM_COLUMN; ++i){
         // section 1: 0x40..0x7F
-        ledColors[row * NUM_COLUMN + i].red = rgbArray[0];
-        ledColors[row * NUM_COLUMN + i].green = rgbArray[1];
-        ledColors[row * NUM_COLUMN + i].blue = rgbArray[2];
+        ledColors[row * NUM_COLUMN + i].red = rgbArray[0] >> intensity;
+        ledColors[row * NUM_COLUMN + i].green = rgbArray[1] >> intensity;
+        ledColors[row * NUM_COLUMN + i].blue = rgbArray[2] >> intensity;
     }
-
 }
 

@@ -27,8 +27,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef MINIFASTLED_INCLUDED 
-#define MINIFASTLED_INCLUDED 
+#ifndef MINIFASTLED_INCLUDED
+#define MINIFASTLED_INCLUDED
 
 #include "board.h"
 #include "hal.h"
@@ -38,8 +38,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     Function Signatures
 */
 void hsv2rgb(uint8_t hue, uint8_t sat, uint8_t val, uint8_t* rgbResults);
-void setAllKeysColorHSV(led_t* ledColors, uint8_t hue, uint8_t sat, uint8_t val);
-void setColumnColorHSV(led_t* ledColors, uint8_t column, uint8_t hue, uint8_t sat, uint8_t val);
-void setRowColorHSV(led_t* ledColors, uint8_t column, uint8_t hue, uint8_t sat, uint8_t val);
+void setAllKeysColorHSV(led_t* ledColors, uint8_t hue, uint8_t sat, uint8_t val, uint8_t intensity);
+void setColumnColorHSV(led_t* ledColors, uint8_t column, uint8_t hue, uint8_t sat, uint8_t val, uint8_t intensity);
+void setRowColorHSV(led_t* ledColors, uint8_t column, uint8_t hue, uint8_t sat, uint8_t val, uint8_t intensity);
 
 #endif

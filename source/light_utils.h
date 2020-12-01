@@ -15,8 +15,8 @@ typedef struct {
 /*
     Function Signatures
 */
-void setAllKeysColor(led_t* ledColors, uint32_t color);
-void setModKeysColor(led_t* ledColors, uint32_t color);
-void setKeyColor(led_t *key, uint32_t color);
+void setAllKeysColor(led_t* ledColors, uint32_t color, uint8_t intensity);
+void setModKeysColor(led_t* ledColors, uint32_t color, uint8_t intensity);
+void setKeyColor(led_t *key, uint32_t color, uint8_t intensity);
 
 #endif
