@@ -105,3 +105,23 @@ void animatedSpectrum(led_t* currentKeyLedColors){
   }
   spectrumValue += spectrumDirection;
 }
+
+static uint8_t waveValue[NUM_COLUMN] = {
+  0, 0, 0, 10, 15, 20, 25, 40, 55, 75, 100, 115,
+  135, 140
+};
+static int waveDirection[NUM_COLUMN] = {
+  1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1
+};
+void animatedWave(led_t* currentKeyLedColors){
+  for(int i = 0; i < NUM_COLUMN; i++){
+    if(waveValue[i] == 140){
+      waveDirection[i] = -1;
+    }else if(waveValue[i] == 10){
+      waveDirection[i] = 1;
+    }
+    setColumnColorHSV(currentKeyLedColors, i, 190, 255, waveValue[i]);
+    waveValue[i] += waveDirection[i];
+  }
+}
