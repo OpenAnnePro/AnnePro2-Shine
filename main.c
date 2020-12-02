@@ -148,22 +148,6 @@ static const SerialConfig usart1Config = {
 
 static uint8_t commandBuffer[64];
 
-/*
- * Thread 1.
- */
-THD_WORKING_AREA(waThread1, 128);
-__attribute__((noreturn)) THD_FUNCTION(Thread1, arg) {
-  (void)arg;
-
-  while(true){
-    msg_t msg;
-    msg = sdGet(&SD1);
-    if(msg >= MSG_OK){
-      executeMsg(msg);
-    }
-  }
-}
-
 void updateLightningTimer(void) {
     uint8_t freq = profiles[currentProfile].animationSpeed[currentSpeed];
     if (freq > 0) {
@@ -408,12 +392,11 @@ int main(void) {
   // Setup Animation Timer
   gptStart(&GPTD_BFTM1, &lightAnimationConfig);
 
-  chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
-  /* This is now the idle thread loop, you may perform here a low priority
-     task but you must never try to sleep or wait in this loop. Note that
-     this tasks runs at the lowest priority level so any instruction added
-     here will be executed after all other tasks have been started.*/
-
   while (true) {
+    msg_t msg;
+    msg = sdGet(&SD1);
+    if (msg >= MSG_OK) {
+      executeMsg(msg);
+    }
   }
 }
