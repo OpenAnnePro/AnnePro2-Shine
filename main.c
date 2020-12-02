@@ -34,6 +34,7 @@ static void ledSetRow(void);
 static void setProfile(void);
 static void changeMask(uint8_t mask);
 static void nextIntensity(void);
+static void nextSpeed(void);
 
 
 ioline_t ledColumns[NUM_COLUMN] = {
@@ -88,14 +89,37 @@ ioline_t ledRows[NUM_ROW * 4] = {
  * Active profiles
  * Add profiles from source/profiles.h in the profile array
  */
-typedef void (*profile)( led_t*, uint8_t );
+typedef void (*lighting_callback)( led_t*, uint8_t );
+
+typedef struct {
+  // callback function implementing the lighting effect
+  lighting_callback callback;
+  // In case the lighting effect is animated, this contains 4 different frequencies
+  // which are passed in gptStartContinuous() and determine how often the function is called.
+  // 1 represents function being called every tick, and n represents being called only on
+  // every n-th tick (skipping other ticks).
+  // We do support 4 different speeds, and generally they go from slowest to fastest.
+  // For static effects, the array should contain {0, 0, 0, 0} which stops the GPT timer.
+  uint8_t animationSpeed[4];
+} profile;
+
 profile profiles[11] = {
-  red, green, blue, rainbowHorizontal, rainbowVertical,
-  animatedRainbowVertical, animatedRainbowFlow, animatedRainbowWaterfall,
-  animatedBreathing, animatedWave, animatedSpectrum
+    { red, {0, 0, 0, 0} },
+    { green, {0, 0, 0, 0} },
+    { blue, {0, 0, 0, 0} },
+    { rainbowHorizontal, {0, 0, 0, 0} },
+    { rainbowVertical, {0, 0, 0, 0} },
+    { animatedRainbowVertical, {20, 10, 8, 5} },
+    { animatedRainbowFlow, {12, 6, 3, 1} },
+    { animatedRainbowWaterfall, {12, 6, 3, 1} },
+    { animatedBreathing, {12, 6, 3, 1} },
+    { animatedWave, {12, 6, 3, 1} },
+    { animatedSpectrum, {12, 6, 3, 1} },
 };
+
 static uint8_t currentProfile = 0;
 static uint8_t amountOfProfiles = sizeof(profiles)/sizeof(profile);
+static uint8_t currentSpeed = 0;
 
 // each color from RGB is rightshifted by this amount
 // default zero corresponds to full intensity, max 3 correponds to 1/8 of color
@@ -140,6 +164,23 @@ __attribute__((noreturn)) THD_FUNCTION(Thread1, arg) {
   }
 }
 
+void updateLightningTimer(void) {
+    uint8_t freq = profiles[currentProfile].animationSpeed[currentSpeed];
+    if (freq > 0) {
+      if (GPTD_BFTM1.state == GPT_CONTINUOUS) {
+        if (gptGetIntervalX(&GPTD_BFTM1) != freq) {
+          gptStopTimer(&GPTD_BFTM1);
+          gptStartContinuous(&GPTD_BFTM1, freq);
+        }
+      } else {
+        gptStartContinuous(&GPTD_BFTM1, freq);
+      }
+
+    } else if (GPTD_BFTM1.state == GPT_CONTINUOUS) {
+      gptStopTimer(&GPTD_BFTM1);
+    }
+}
+
 /*
  * Execute action based on a message
  */
@@ -163,10 +204,12 @@ void executeMsg(msg_t msg) {
     case CMD_LED_NEXT_PROFILE:
       currentProfile = (currentProfile+1)%amountOfProfiles;
       executeProfile();
+      updateLightningTimer();
       break;
     case CMD_LED_PREV_PROFILE:
       currentProfile = (currentProfile+(amountOfProfiles-1u))%amountOfProfiles;
       executeProfile();
+      updateLightningTimer();
       break;
     case CMD_LED_GET_PROFILE:
       sdWrite(&SD1, &currentProfile, 1);
@@ -182,6 +225,9 @@ void executeMsg(msg_t msg) {
       break;
     case CMD_LED_NEXT_INTENSITY:
       nextIntensity();
+      break;
+    case CMD_LED_NEXT_ANIMATION_SPEED:
+      nextSpeed();
       break;
     default:
       break;
@@ -205,6 +251,14 @@ void nextIntensity() {
 }
 
 
+
+void nextSpeed() {
+    currentSpeed = (currentSpeed + 1) % 4;
+    updateLightningTimer();
+}
+
+
+
 /*
  * Set profile and execute it
  */
@@ -217,6 +271,7 @@ void setProfile() {
       currentProfile = commandBuffer[0];
 
       executeProfile();
+      updateLightningTimer();
     }
   }
 }
@@ -226,7 +281,7 @@ void setProfile() {
  */
 void executeProfile() {
   chSysLock();
-  profiles[currentProfile](ledColors, ledIntensity);
+  profiles[currentProfile].callback(ledColors, ledIntensity);
   chSysUnlock();
 }
 
@@ -235,6 +290,9 @@ void executeProfile() {
  */
 void disableLeds() {
   palClearLine(LINE_LED_PWR);
+  if (GPTD_BFTM1.state == GPT_CONTINUOUS) {
+    gptStopTimer(&GPTD_BFTM1);
+  }
 }
 
 /*
@@ -243,6 +301,7 @@ void disableLeds() {
 void enableLeds() {
   palSetLine(LINE_LED_PWR);
   executeProfile();
+  updateLightningTimer();
 }
 
 /*
@@ -280,26 +339,8 @@ inline uint8_t min(uint8_t a, uint8_t b) {
  * Update lighting table as per animation
  */
 void animationCallback(GPTDriver* _driver) {
-  profile currentFunction = profiles[currentProfile];
-  if (currentFunction == animatedRainbowVertical) {
-    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/5);
-    currentFunction(ledColors, ledIntensity);
-  } else if (currentFunction == animatedRainbowWaterfall) {
-    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/20);
-    currentFunction(ledColors, ledIntensity);
-  } else if (currentFunction == animatedRainbowFlow) {
-    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
-    currentFunction(ledColors, ledIntensity);
-  } else if (currentFunction == animatedSpectrum) {
-    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/15);
-    currentFunction(ledColors, ledIntensity);
-  } else if (currentFunction == animatedBreathing) {
-    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
-    currentFunction(ledColors, ledIntensity);
-  } else if (currentFunction == animatedWave) {
-    gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/60);
-    currentFunction(ledColors, ledIntensity);
-  }
+  (void)_driver;
+  profiles[currentProfile].callback(ledColors, ledIntensity);
 }
 
 inline void sPWM(uint8_t cycle, uint8_t currentCount, uint8_t start, ioline_t port) {
@@ -349,7 +390,7 @@ int main(void) {
   halInit();
   chSysInit();
 
-  profiles[currentProfile](ledColors, ledIntensity);
+  profiles[currentProfile].callback(ledColors, ledIntensity);
 
   // Setup masks to all be 0xFF at the start
   for (size_t i = 0; i < KEY_COUNT; ++i)
@@ -366,7 +407,6 @@ int main(void) {
 
   // Setup Animation Timer
   gptStart(&GPTD_BFTM1, &lightAnimationConfig);
-  gptStartContinuous(&GPTD_BFTM1, 1);
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO, Thread1, NULL);
   /* This is now the idle thread loop, you may perform here a low priority

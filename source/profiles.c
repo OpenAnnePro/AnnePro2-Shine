@@ -61,10 +61,10 @@ static uint8_t flowValue[NUM_COLUMN] = {0,  11, 22, 33,  44,  55,  66,
 void animatedRainbowFlow(led_t *currentKeyLedColors, uint8_t intensity) {
   for (int i = 0; i < NUM_COLUMN; i++) {
     setColumnColorHSV(currentKeyLedColors, i, flowValue[i], 255, 125, intensity);
-    if (flowValue[i] == 179) {
+    if (flowValue[i] >= 179 && flowValue[i] < 240) {
       flowValue[i] = 240;
     }
-    flowValue[i]++;
+    flowValue[i] += 3;
   }
 }
 
@@ -74,10 +74,10 @@ void animatedRainbowWaterfall(led_t *currentKeyLedColors, uint8_t intensity) {
   for (int i = 0; i < NUM_ROW; i++) {
     setRowColorHSV(currentKeyLedColors, i, waterfallValue[i], 255, 125,
                    intensity);
-    if (waterfallValue[i] == 179) {
+    if (waterfallValue[i] >= 179 && waterfallValue[i] < 240) {
       waterfallValue[i] = 240;
     }
-    waterfallValue[i]++;
+    waterfallValue[i] += 3;
   }
 }
 
@@ -86,9 +86,9 @@ static int breathingDirection = -1;
 void animatedBreathing(led_t *currentKeyLedColors, uint8_t intensity) {
   setAllKeysColorHSV(currentKeyLedColors, 85, 255, breathingValue, intensity);
   if (breathingValue >= 180) {
-    breathingDirection = -1;
-  } else if (breathingValue <= 0) {
-    breathingDirection = 1;
+    breathingDirection = -3;
+  } else if (breathingValue <= 2) {
+    breathingDirection = 3;
   }
   breathingValue += breathingDirection;
 }
@@ -97,10 +97,10 @@ static uint8_t spectrumValue = 2;
 static int spectrumDirection = 1;
 void animatedSpectrum(led_t *currentKeyLedColors, uint8_t intensity) {
   setAllKeysColorHSV(currentKeyLedColors, spectrumValue, 255, 125, intensity);
-  if (spectrumValue >= 179) {
-    spectrumDirection = -1;
-  } else if (spectrumValue <= 1) {
-    spectrumDirection = 1;
+  if (spectrumValue >= 177) {
+    spectrumDirection = -3;
+  } else if (spectrumValue <= 2) {
+    spectrumDirection = 3;
   }
   spectrumValue += spectrumDirection;
 }
@@ -110,15 +110,15 @@ static uint8_t waveValue[NUM_COLUMN] = {
   135, 140
 };
 static int waveDirection[NUM_COLUMN] = {
-  1, 1, 1, 1, 1, 1, 1,
-  1, 1, 1, 1, 1, 1, 1
+  3, 3, 3, 3, 3, 3, 3,
+  3, 3, 3, 3, 3, 3, 3
 };
 void animatedWave(led_t* currentKeyLedColors, uint8_t intensity){
   for(int i = 0; i < NUM_COLUMN; i++){
-    if(waveValue[i] == 140){
-      waveDirection[i] = -1;
-    }else if(waveValue[i] == 10){
-      waveDirection[i] = 1;
+    if (waveValue[i] >= 140) {
+      waveDirection[i] = -3;
+    } else if(waveValue[i] <= 10) {
+      waveDirection[i] = 3;
     }
     setColumnColorHSV(currentKeyLedColors, i, 190, 255, waveValue[i], intensity);
     waveValue[i] += waveDirection[i];
