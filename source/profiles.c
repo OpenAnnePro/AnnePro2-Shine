@@ -1,5 +1,6 @@
 #include "profiles.h"
 #include "miniFastLED.h"
+#include "string.h"
 
 // An array of basic colors used accross different lighting profiles
 // static const uint32_t colorPalette[] = {0xFF0000, 0xF0F00, 0x00F00, 0x00F0F,
@@ -123,4 +124,36 @@ void animatedWave(led_t* currentKeyLedColors, uint8_t intensity){
     setColumnColorHSV(currentKeyLedColors, i, 190, 255, waveValue[i], intensity);
     waveValue[i] += waveDirection[i];
   }
+}
+
+uint8_t animatedPressedFadeBuf[NUM_ROW * NUM_COLUMN] = { 0 };
+
+void reactiveFade(led_t* ledColors, uint8_t intensity) {
+  for (int i = 0; i < NUM_ROW * NUM_COLUMN; i++) {
+    if (animatedPressedFadeBuf[i] > 5) {
+      animatedPressedFadeBuf[i] -= 5;
+      hsv2rgb(100 - animatedPressedFadeBuf[i], 255, 125, (uint8_t*)&ledColors[i]);
+      ledColors[i].red >>= intensity;
+      ledColors[i].green >>= intensity;
+      ledColors[i].blue >>= intensity;
+    } else if (animatedPressedFadeBuf[i] > 0) {
+      ledColors[i].blue = 0;
+      ledColors[i].red = 0;
+      ledColors[i].green = 0;
+      animatedPressedFadeBuf[i] = 0;
+    }
+  }
+}
+
+void reactiveFadeKeypress(led_t* ledColors, uint8_t row, uint8_t col, uint8_t intensity) {
+  int i = row * NUM_COLUMN + col;
+  animatedPressedFadeBuf[i] = 100;
+  ledColors[i].green = 0;
+  ledColors[i].red = 0xFF >> intensity;
+  ledColors[i].blue = 0;
+}
+
+void reactiveFadeInit(led_t* ledColors) {
+  memset(animatedPressedFadeBuf, 0, sizeof(animatedPressedFadeBuf));
+  memset(ledColors, 0, NUM_ROW * NUM_COLUMN * 3);
 }

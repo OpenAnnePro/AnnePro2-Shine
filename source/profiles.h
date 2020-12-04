@@ -19,3 +19,10 @@ void animatedRainbowWaterfall(led_t* currentKeyLedColors, uint8_t intensity);
 void animatedBreathing(led_t* currentKeyLedColors, uint8_t intensity);
 void animatedSpectrum(led_t* currentKeyLedColors, uint8_t intensity);
 void animatedWave(led_t* currentKeyLedColors, uint8_t intensity);
+
+/*
+ * ANIMATED - responding to key presses
+ */
+void reactiveFade(led_t* ledColors, uint8_t intensity);
+void reactiveFadeKeypress(led_t* ledColors, uint8_t row, uint8_t col, uint8_t intensity);
+void reactiveFadeInit(led_t* ledColors);
