@@ -35,6 +35,7 @@ static void setProfile(void);
 static void changeMask(uint8_t mask);
 static void nextIntensity(void);
 static void nextSpeed(void);
+static void setForegroundColor(void);
 
 
 ioline_t ledColumns[NUM_COLUMN] = {
@@ -213,6 +214,9 @@ void executeMsg(msg_t msg) {
     case CMD_LED_NEXT_ANIMATION_SPEED:
       nextSpeed();
       break;
+    case CMD_LED_SET_FOREGROUND_COLOR:
+      setForegroundColor();
+      break;
     default:
       break;
   }
@@ -244,6 +248,29 @@ void nextSpeed() {
 
 
 /*
+ * Flag to check if there is a foreground color currently active
+ */
+static bool is_foregroundColor_set = false;
+/*
+ * Set all the leds to the specified color
+ */
+void setForegroundColor(){
+  size_t bytesRead;
+  bytesRead = sdReadTimeout(&SD1, commandBuffer, 3, 10000);
+
+  if(bytesRead >= 3)
+  {
+    uint8_t colorBytes[4] = {commandBuffer[2], commandBuffer[1], commandBuffer[0], 0x00};
+    uint32_t ForegroundColor = *(uint32_t*)&colorBytes;
+    is_foregroundColor_set = true;
+
+    chSysLock();
+    setAllKeysColor(ledColors, ForegroundColor, ledIntensity);
+    chSysUnlock();
+  } 
+}
+
+/*
  * Set profile and execute it
  */
 void setProfile() {
@@ -254,6 +281,8 @@ void setProfile() {
     if (commandBuffer[0] < amountOfProfiles) {
       currentProfile = commandBuffer[0];
 
+      // Here we disable the foreground to ensure the profile will be active
+      is_foregroundColor_set = false;
       executeProfile();
       updateLightningTimer();
     }
@@ -324,7 +353,11 @@ inline uint8_t min(uint8_t a, uint8_t b) {
  */
 void animationCallback(GPTDriver* _driver) {
   (void)_driver;
-  profiles[currentProfile].callback(ledColors, ledIntensity);
+
+  // If the foreground is set we skip the animation as a way to avoid it overrides the foreground
+  if(!is_foregroundColor_set) {
+    profiles[currentProfile].callback(ledColors, ledIntensity);
+  }
 }
 
 inline void sPWM(uint8_t cycle, uint8_t currentCount, uint8_t start, ioline_t port) {
