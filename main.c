@@ -26,25 +26,26 @@
 static void columnCallback(GPTDriver* driver);
 static void animationCallback(GPTDriver* driver);
 static void executeMsg(msg_t msg);
-static void switchProfile(void);
 static void executeProfile(void);
 static void disableLeds(void);
 static void enableLeds(void);
 static void ledSet(void);
 static void ledSetRow(void);
 static void setProfile(void);
+static void changeMask(uint8_t mask);
+static void nextIntensity(void);
 
 
 ioline_t ledColumns[NUM_COLUMN] = {
-  LINE_LED_COL_1, 
-  LINE_LED_COL_2, 
-  LINE_LED_COL_3, 
-  LINE_LED_COL_4, 
-  LINE_LED_COL_5, 
-  LINE_LED_COL_6, 
-  LINE_LED_COL_7, 
-  LINE_LED_COL_8, 
-  LINE_LED_COL_9, 
+  LINE_LED_COL_1,
+  LINE_LED_COL_2,
+  LINE_LED_COL_3,
+  LINE_LED_COL_4,
+  LINE_LED_COL_5,
+  LINE_LED_COL_6,
+  LINE_LED_COL_7,
+  LINE_LED_COL_8,
+  LINE_LED_COL_9,
   LINE_LED_COL_10,
   LINE_LED_COL_11,
   LINE_LED_COL_12,
@@ -79,24 +80,29 @@ ioline_t ledRows[NUM_ROW * 4] = {
 
 #define ANIMATION_TIMER_FREQUENCY   60
 
+#define KEY_COUNT                   70
+
 #define LEN(a) (sizeof(a)/sizeof(*a))
 
 /*
  * Active profiles
  * Add profiles from source/profiles.h in the profile array
  */
-typedef void (*profile)( led_t* );
+typedef void (*profile)( led_t*, uint8_t );
 profile profiles[11] = {
-  red, green, blue, rainbowHorizontal, rainbowVertical, 
-  animatedRainbowVertical, animatedRainbowFlow, animatedRainbowWaterfall, 
+  red, green, blue, rainbowHorizontal, rainbowVertical,
+  animatedRainbowVertical, animatedRainbowFlow, animatedRainbowWaterfall,
   animatedBreathing, animatedWave, animatedSpectrum
 };
 static uint8_t currentProfile = 0;
 static uint8_t amountOfProfiles = sizeof(profiles)/sizeof(profile);
 
-// TODO: change this 70 magic constant to a define
-uint8_t ledMasks[70];
-led_t ledColors[70];
+// each color from RGB is rightshifted by this amount
+// default zero corresponds to full intensity, max 3 correponds to 1/8 of color
+static uint8_t ledIntensity = 0;
+
+uint8_t ledMasks[KEY_COUNT];
+led_t ledColors[KEY_COUNT];
 static uint32_t currentColumn = 0;
 static uint32_t columnPWMCount = 0;
 
@@ -137,7 +143,7 @@ __attribute__((noreturn)) THD_FUNCTION(Thread1, arg) {
 /*
  * Execute action based on a message
  */
-void executeMsg(msg_t msg){
+void executeMsg(msg_t msg) {
   switch (msg) {
     case CMD_LED_ON:
       enableLeds();
@@ -174,6 +180,9 @@ void executeMsg(msg_t msg){
     case CMD_LED_CLEAR_MASK:
       changeMask(0x00);
       break;
+    case CMD_LED_NEXT_INTENSITY:
+      nextIntensity();
+      break;
     default:
       break;
   }
@@ -184,73 +193,68 @@ void changeMask(uint8_t mask) {
   bytesRead = sdReadTimeout(&SD1, commandBuffer, 1, 10000);
 
   if (bytesRead == 1) {
-    if(commandBuffer[0] < 70) {
+    if(commandBuffer[0] < KEY_COUNT) {
       ledMasks[commandBuffer[0]] = mask;
     }
   }
 }
 
+void nextIntensity() {
+    ledIntensity = (ledIntensity + 1) % 4;
+    executeProfile();
+}
+
+
 /*
  * Set profile and execute it
  */
-void setProfile(){
+void setProfile() {
   size_t bytesRead;
   bytesRead = sdReadTimeout(&SD1, commandBuffer, 1, 10000);
 
-  if(bytesRead == 1){
-    if(commandBuffer[0] < amountOfProfiles){
+  if (bytesRead == 1) {
+    if (commandBuffer[0] < amountOfProfiles) {
       currentProfile = commandBuffer[0];
+
+      executeProfile();
     }
   }
-
-  // set colors without turning on leds (if we have a saved profile off by default in eeprom)
-  chSysLock();
-  profiles[currentProfile](ledColors);
-  chSysUnlock();
-}
-
-/*
- * Switch to next profile and execute it
- */
-void switchProfile(){
-  currentProfile = (currentProfile+1)%amountOfProfiles;
-  executeProfile();
 }
 
 /*
  * Execute current profile
  */
-void executeProfile(){
+void executeProfile() {
   chSysLock();
-  profiles[currentProfile](ledColors);
+  profiles[currentProfile](ledColors, ledIntensity);
   chSysUnlock();
 }
 
 /*
  * Turn off all leds
  */
-void disableLeds(){
+void disableLeds() {
   palClearLine(LINE_LED_PWR);
 }
 
 /*
  * Turn on all leds
  */
-void enableLeds(){
+void enableLeds() {
   palSetLine(LINE_LED_PWR);
 }
 
 /*
  * Set a led based on qmk communication
  */
-void ledSet(){
+void ledSet() {
   size_t bytesRead;
   bytesRead = sdReadTimeout(&SD1, commandBuffer, 4, 10000);
 
-  if(bytesRead >= 4){
-      if(commandBuffer[0] < NUM_ROW || commandBuffer[1] < NUM_COLUMN){
-          setKeyColor(&ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]], ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]));
-      }
+  if (bytesRead >= 4) {
+    if (commandBuffer[0] < NUM_ROW || commandBuffer[1] < NUM_COLUMN) {
+      setKeyColor(&ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]], ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]), ledIntensity);
+    }
   }
 }
 
@@ -260,44 +264,44 @@ void ledSet(){
 void ledSetRow(){
   size_t bytesRead;
   bytesRead = sdReadTimeout(&SD1, commandBuffer, sizeof(uint16_t) * NUM_COLUMN + 1, 1000);
-  if(bytesRead >= sizeof(uint16_t) * NUM_COLUMN + 1){
-    if(commandBuffer[0] < NUM_ROW){
-      memcpy(&ledColors[commandBuffer[0] * NUM_COLUMN],&commandBuffer[1], sizeof(uint16_t) * NUM_COLUMN); 
+  if (bytesRead >= sizeof(uint16_t) * NUM_COLUMN + 1) {
+    if (commandBuffer[0] < NUM_ROW) {
+      memcpy(&ledColors[commandBuffer[0] * NUM_COLUMN],&commandBuffer[1], sizeof(uint16_t) * NUM_COLUMN);
     }
   }
 }
 
-inline uint8_t min(uint8_t a, uint8_t b){
+inline uint8_t min(uint8_t a, uint8_t b) {
   return a<=b?a:b;
 }
 
 /*
  * Update lighting table as per animation
  */
-void animationCallback(GPTDriver* _driver){
+void animationCallback(GPTDriver* _driver) {
   profile currentFunction = profiles[currentProfile];
-  if(currentFunction == animatedRainbowVertical){
+  if (currentFunction == animatedRainbowVertical) {
     gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/5);
-    currentFunction(ledColors);
-  }else if(currentFunction == animatedRainbowWaterfall){
+    currentFunction(ledColors, ledIntensity);
+  } else if (currentFunction == animatedRainbowWaterfall) {
     gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/20);
-    currentFunction(ledColors);
-  }else if(currentFunction == animatedRainbowFlow){
+    currentFunction(ledColors, ledIntensity);
+  } else if (currentFunction == animatedRainbowFlow) {
     gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
-    currentFunction(ledColors);
-  }else if(currentFunction == animatedSpectrum){
+    currentFunction(ledColors, ledIntensity);
+  } else if (currentFunction == animatedSpectrum) {
     gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/15);
-    currentFunction(ledColors);
-  }else if(currentFunction == animatedBreathing){
+    currentFunction(ledColors, ledIntensity);
+  } else if (currentFunction == animatedBreathing) {
     gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/30);
-    currentFunction(ledColors);
-  }else if(currentFunction == animatedWave){
+    currentFunction(ledColors, ledIntensity);
+  } else if (currentFunction == animatedWave) {
     gptChangeInterval(_driver, ANIMATION_TIMER_FREQUENCY/60);
-    currentFunction(ledColors);
+    currentFunction(ledColors, ledIntensity);
   }
 }
 
-inline void sPWM(uint8_t cycle, uint8_t currentCount, uint8_t start, ioline_t port){
+inline void sPWM(uint8_t cycle, uint8_t currentCount, uint8_t start, ioline_t port) {
   if (start+cycle>0xFF) start = 0xFF - cycle;
   if (start <= currentCount && currentCount < start+cycle)
     palSetLine(port);
@@ -305,16 +309,13 @@ inline void sPWM(uint8_t cycle, uint8_t currentCount, uint8_t start, ioline_t po
     palClearLine(port);
 }
 
-void columnCallback(GPTDriver* _driver)
-{
+void columnCallback(GPTDriver* _driver) {
   (void)_driver;
 
   palClearLine(ledColumns[currentColumn]);
   currentColumn = (currentColumn+1) % NUM_COLUMN;
-  if (columnPWMCount < 255)
-  {
-    for (size_t row = 0; row < NUM_ROW; row++)
-    {
+  if (columnPWMCount < 255) {
+    for (size_t row = 0; row < NUM_ROW; row++) {
       const size_t ledIndex = currentColumn + (NUM_COLUMN * row);
       const led_t keyLED = ledColors[ledIndex];
       const uint8_t ledMask = ledMasks[ledIndex];
@@ -327,9 +328,7 @@ void columnCallback(GPTDriver* _driver)
       sPWM(blue, columnPWMCount, red+green, ledRows[(row << 2) | 2]);
     }
     columnPWMCount++;
-  }
-  else
-  {
+  } else {
     columnPWMCount = 0;
   }
   palSetLine(ledColumns[currentColumn]);
@@ -349,14 +348,14 @@ int main(void) {
   halInit();
   chSysInit();
 
-  profiles[currentProfile](ledColors);
+  profiles[currentProfile](ledColors, ledIntensity);
+
+  // Setup masks to all be 0xFF at the start
+  for (size_t i = 0; i < KEY_COUNT; ++i)
   {
-    // Setup masks to all be 0xFF at the start
-    for (size_t i = 0; i < 70; ++i)
-    {
-      ledMasks[i] = 0xFF;
-    }
-  }  
+    ledMasks[i] = 0xFF;
+  }
+
   palClearLine(LINE_LED_PWR);
   sdStart(&SD1, &usart1Config);
 
