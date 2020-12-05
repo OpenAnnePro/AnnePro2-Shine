@@ -126,6 +126,9 @@ static uint8_t currentSpeed = 0;
 // default zero corresponds to full intensity, max 3 correponds to 1/8 of color
 static uint8_t ledIntensity = 0;
 
+// Flag to check if there is a foreground color currently active
+static bool is_foregroundColor_set = false;
+
 uint8_t ledMasks[KEY_COUNT];
 led_t ledColors[KEY_COUNT];
 static uint32_t currentColumn = 0;
@@ -164,6 +167,8 @@ void updateLightningTimer(void) {
     } else if (GPTD_BFTM1.state == GPT_CONTINUOUS) {
       gptStopTimer(&GPTD_BFTM1);
     }
+    // Here we disable the foreground so the speed change is visible
+    is_foregroundColor_set = false;
 }
 
 /*
@@ -248,10 +253,6 @@ void nextSpeed() {
 
 
 /*
- * Flag to check if there is a foreground color currently active
- */
-static bool is_foregroundColor_set = false;
-/*
  * Set all the leds to the specified color
  */
 void setForegroundColor(){
@@ -281,8 +282,6 @@ void setProfile() {
     if (commandBuffer[0] < amountOfProfiles) {
       currentProfile = commandBuffer[0];
 
-      // Here we disable the foreground to ensure the profile will be active
-      is_foregroundColor_set = false;
       executeProfile();
       updateLightningTimer();
     }
@@ -294,6 +293,9 @@ void setProfile() {
  */
 void executeProfile() {
   chSysLock();
+  // Here we disable the foreground to ensure the animation will run
+  is_foregroundColor_set = false;
+
   profiles[currentProfile].callback(ledColors, ledIntensity);
   chSysUnlock();
 }
