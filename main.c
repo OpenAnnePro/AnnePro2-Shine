@@ -242,6 +242,7 @@ void disableLeds() {
  */
 void enableLeds() {
   palSetLine(LINE_LED_PWR);
+  executeProfile();
 }
 
 /*
