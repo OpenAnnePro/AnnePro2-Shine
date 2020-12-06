@@ -32,7 +32,7 @@ pipeline {
               tar czvf c18_archive.tgz C18
               cd ..
             '''
-            archiveArtifacts artifacts: 'build/C18/*', followSymlinks: false
+            archiveArtifacts artifacts: 'build/C18/*.bin', followSymlinks: false
             archiveArtifacts artifacts: 'build/*.tgz', followSymlinks: false
             fingerprint 'build/C18/*.elf'
             fingerprint 'build/C18/*.bin'
