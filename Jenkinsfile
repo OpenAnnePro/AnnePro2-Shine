@@ -9,8 +9,15 @@ pipeline {
           }
           steps {
             sh '''make C15'''
-            archiveArtifacts artifacts: 'build/annepro2-shine-C15.*', followSymlinks: false
-            fingerprint 'build/*'
+            sh '''
+              cd build
+              tar czvf c15_archive.tgz C15
+              cd ..
+            '''
+            archiveArtifacts artifacts: 'build/C15/*.bin', followSymlinks: false
+            archiveArtifacts artifacts: 'build/*.tgz', followSymlinks: false
+            fingerprint 'build/C15/*.elf'
+            fingerprint 'build/C15/*.bin'
           }
         }
 
@@ -20,8 +27,15 @@ pipeline {
           }
           steps {
             sh '''make C18'''
-            archiveArtifacts artifacts: 'build/annepro2-shine-C18.*', followSymlinks: false
-            fingerprint 'build/*'
+            sh '''
+              cd build
+              tar czvf c18_archive.tgz C18
+              cd ..
+            '''
+            archiveArtifacts artifacts: 'build/C18/*', followSymlinks: false
+            archiveArtifacts artifacts: 'build/*.tgz', followSymlinks: false
+            fingerprint 'build/C18/*.elf'
+            fingerprint 'build/C18/*.bin'
           }
         }
       }
