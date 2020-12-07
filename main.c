@@ -36,7 +36,7 @@ static void changeMask(uint8_t mask);
 static void nextIntensity(void);
 static void nextSpeed(void);
 static void setForegroundColor(void);
-
+static void handleKeypress(msg_t msg);
 
 ioline_t ledColumns[NUM_COLUMN] = {
   LINE_LED_COL_1,
@@ -92,6 +92,13 @@ ioline_t ledRows[NUM_ROW * 4] = {
  */
 typedef void (*lighting_callback)( led_t*, uint8_t );
 
+/*
+ * keypress handler
+ */
+typedef void (*keypress_handler)( led_t* colors, uint8_t row, uint8_t col, uint8_t intensity );
+
+typedef void (*profile_init)( led_t* colors );
+
 typedef struct {
   // callback function implementing the lighting effect
   lighting_callback callback;
@@ -102,20 +109,27 @@ typedef struct {
   // We do support 4 different speeds, and generally they go from slowest to fastest.
   // For static effects, the array should contain {0, 0, 0, 0} which stops the GPT timer.
   uint8_t animationSpeed[4];
+  // In case the profile is reactive, it responds to each keypress.
+  // This callback is called with the locations of the pressed keys.
+  keypress_handler keypressCallback;
+  // Some profiles might need additional setup when just enabled.
+  // This callback defines such logic if needed.
+  profile_init profileInit;
 } profile;
 
-profile profiles[11] = {
-    { red, {0, 0, 0, 0} },
-    { green, {0, 0, 0, 0} },
-    { blue, {0, 0, 0, 0} },
-    { rainbowHorizontal, {0, 0, 0, 0} },
-    { rainbowVertical, {0, 0, 0, 0} },
-    { animatedRainbowVertical, {20, 10, 8, 5} },
-    { animatedRainbowFlow, {12, 6, 3, 1} },
-    { animatedRainbowWaterfall, {12, 6, 3, 1} },
-    { animatedBreathing, {12, 6, 3, 1} },
-    { animatedWave, {12, 6, 3, 1} },
-    { animatedSpectrum, {12, 6, 3, 1} },
+profile profiles[12] = {
+    { red, {0, 0, 0, 0}, NULL, NULL },
+    { green, {0, 0, 0, 0}, NULL, NULL },
+    { blue, {0, 0, 0, 0}, NULL, NULL },
+    { rainbowHorizontal, {0, 0, 0, 0}, NULL, NULL },
+    { rainbowVertical, {0, 0, 0, 0}, NULL, NULL },
+    { animatedRainbowVertical, {20, 10, 8, 5}, NULL, NULL },
+    { animatedRainbowFlow, {12, 6, 3, 1}, NULL, NULL },
+    { animatedRainbowWaterfall, {12, 6, 3, 1}, NULL, NULL },
+    { animatedBreathing, {12, 6, 3, 1}, NULL, NULL },
+    { animatedWave, {12, 6, 3, 1}, NULL, NULL },
+    { animatedSpectrum, {12, 6, 3, 1}, NULL, NULL },
+    { reactiveFade, {12, 6, 3, 1}, reactiveFadeKeypress, reactiveFadeInit },
 };
 
 static uint8_t currentProfile = 0;
@@ -172,6 +186,20 @@ void updateLightningTimer(void) {
 }
 
 /*
+ * Reactive profiles are profiles which react to keypresses.
+ * This helper is used to notify the main controller that
+ * the current profile is reactive and coordinates of pressed
+ * keys should be sent to LED controller.
+ */
+void forwardReactiveFlag(void) {
+  uint8_t isReactive = 0;
+  if (profiles[currentProfile].keypressCallback != NULL) {
+    isReactive = 1;
+  }
+  sdWrite(&SD1, &isReactive, 1);
+}
+
+/*
  * Execute action based on a message
  */
 void executeMsg(msg_t msg) {
@@ -190,11 +218,16 @@ void executeMsg(msg_t msg) {
       break;
     case CMD_LED_SET_PROFILE:
       setProfile();
+      forwardReactiveFlag();
       break;
     case CMD_LED_NEXT_PROFILE:
       currentProfile = (currentProfile+1)%amountOfProfiles;
+      if (profiles[currentProfile].profileInit != NULL) {
+        profiles[currentProfile].profileInit(ledColors);
+      }
       executeProfile();
       updateLightningTimer();
+      forwardReactiveFlag();
       break;
     case CMD_LED_PREV_PROFILE:
       currentProfile = (currentProfile+(amountOfProfiles-1u))%amountOfProfiles;
@@ -223,6 +256,9 @@ void executeMsg(msg_t msg) {
       setForegroundColor();
       break;
     default:
+      if (msg & 0b10000000) {
+        handleKeypress(msg);
+      }
       break;
   }
 }
@@ -250,7 +286,20 @@ void nextSpeed() {
     updateLightningTimer();
 }
 
-
+/*
+ * The message contains 1 flag bit which is always set
+ * and then 3 bits of row and 4 bits of col.
+ * Because this callback is called on every keypress,
+ * the data is packed into a single byte to decrease the data traffic.
+ */
+inline void handleKeypress(msg_t msg) {
+  uint8_t row = (msg >> 4) & 0b111;
+  uint8_t col = msg & 0b1111;
+  keypress_handler handler = profiles[currentProfile].keypressCallback;
+  if (handler != NULL) {
+    handler(ledColors, row, col, ledIntensity);
+  }
+}
 
 /*
  * Set all the leds to the specified color
@@ -268,7 +317,7 @@ void setForegroundColor(){
     chSysLock();
     setAllKeysColor(ledColors, ForegroundColor, ledIntensity);
     chSysUnlock();
-  } 
+  }
 }
 
 /*
@@ -281,7 +330,9 @@ void setProfile() {
   if (bytesRead == 1) {
     if (commandBuffer[0] < amountOfProfiles) {
       currentProfile = commandBuffer[0];
-
+      if (profiles[currentProfile].profileInit != NULL) {
+        profiles[currentProfile].profileInit(ledColors);
+      }
       executeProfile();
       updateLightningTimer();
     }
@@ -296,6 +347,9 @@ void executeProfile() {
   // Here we disable the foreground to ensure the animation will run
   is_foregroundColor_set = false;
 
+  if (profiles[currentProfile].profileInit != NULL) {
+    profiles[currentProfile].profileInit(ledColors);
+  }
   profiles[currentProfile].callback(ledColors, ledIntensity);
   chSysUnlock();
 }
@@ -314,6 +368,9 @@ void disableLeds() {
  * Turn on all leds
  */
 void enableLeds() {
+  if (profiles[currentProfile].profileInit != NULL) {
+    profiles[currentProfile].profileInit(ledColors);
+  }
   palSetLine(LINE_LED_PWR);
   executeProfile();
   updateLightningTimer();
@@ -372,7 +429,6 @@ inline void sPWM(uint8_t cycle, uint8_t currentCount, uint8_t start, ioline_t po
 
 void columnCallback(GPTDriver* _driver) {
   (void)_driver;
-
   palClearLine(ledColumns[currentColumn]);
   currentColumn = (currentColumn+1) % NUM_COLUMN;
   if (columnPWMCount < 255) {

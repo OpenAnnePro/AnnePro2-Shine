@@ -14,3 +14,4 @@
 #define CMD_LED_NEXT_INTENSITY              0xC
 #define CMD_LED_NEXT_ANIMATION_SPEED        0xD
 #define CMD_LED_SET_FOREGROUND_COLOR        0xE
+#define CMD_LED_KEYPRESS                    0xF

@@ -99,7 +99,6 @@ void hsv2rgb(uint8_t hue, uint8_t sat, uint8_t val, uint8_t* rgbResults){
         rgbResults[1] = rampup_adj_with_floor;
         rgbResults[2] = brightness_floor;
     }
-
 }
 
 // Set all keys to HSV color
