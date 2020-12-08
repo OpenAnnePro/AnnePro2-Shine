@@ -21,6 +21,7 @@
 #include <string.h>
 /* ============ Private Defines ===================== */
 
+// clang-format off
 /* ============ Function Prototypes ================== */
 #define PBIT(PORT, LINE) ((PAL_PORT(LINE) == PORT) ? (1 << PAL_PAD(LINE)) : 0)
 #define P2BVAL(PORT, LINE, VAL) ((PAL_PORT(LINE) == PORT) ? (VAL << (PAL_PAD(LINE) << 1)) : 0)
@@ -132,7 +133,7 @@
     PAFIO(PORT, N, LINE_USART_RX,       AFIO_USART)|\
 0)
 
-
+// clang-format on
 
 /**
  * @brief   PAL setup.
@@ -141,68 +142,69 @@
  */
 const PALConfig pal_default_config = {
     // GPIO A
-    .setup[0] = {
-        .DIR = OUT_BITS(IOPORTA),
-        .INE = IN_BITS(IOPORTA),
-        .PU = IN_BITS(IOPORTA),
-        .PD = 0x0000,
-        .OD = 0x0000,
-        .DRV = HIGH_CURRENT_BITS(IOPORTA),
-        .LOCK = 0x0000,
-        .OUT = 0x0000,
-        .CFG[0] = AF_BITS(IOPORTA, 0),
-        .CFG[1] = AF_BITS(IOPORTA, 1),
-    },
+    .setup[0] =
+        {
+            .DIR = OUT_BITS(IOPORTA),
+            .INE = IN_BITS(IOPORTA),
+            .PU = IN_BITS(IOPORTA),
+            .PD = 0x0000,
+            .OD = 0x0000,
+            .DRV = HIGH_CURRENT_BITS(IOPORTA),
+            .LOCK = 0x0000,
+            .OUT = 0x0000,
+            .CFG[0] = AF_BITS(IOPORTA, 0),
+            .CFG[1] = AF_BITS(IOPORTA, 1),
+        },
     // GPIO B
-    .setup[1] = {
-        .DIR = OUT_BITS(IOPORTB),
-        .INE = IN_BITS(IOPORTB),
-        .PU = IN_BITS(IOPORTB),
-        .PD = 0x0000,
-        .OD = 0x0000,
-        .DRV = HIGH_CURRENT_BITS(IOPORTB),
-        .LOCK = 0x0000,
-        .OUT = 0x0000,
-        .CFG[0] = AF_BITS(IOPORTB, 0),
-        .CFG[1] = AF_BITS(IOPORTB, 1),
-    },
+    .setup[1] =
+        {
+            .DIR = OUT_BITS(IOPORTB),
+            .INE = IN_BITS(IOPORTB),
+            .PU = IN_BITS(IOPORTB),
+            .PD = 0x0000,
+            .OD = 0x0000,
+            .DRV = HIGH_CURRENT_BITS(IOPORTB),
+            .LOCK = 0x0000,
+            .OUT = 0x0000,
+            .CFG[0] = AF_BITS(IOPORTB, 0),
+            .CFG[1] = AF_BITS(IOPORTB, 1),
+        },
     // GPIO C
-    .setup[2] = {
-        .DIR = OUT_BITS(IOPORTC),
-        .INE = IN_BITS(IOPORTC),
-        .PU = IN_BITS(IOPORTC),
-        .PD = 0x0000,
-        .OD = 0x0000,
-        .DRV = HIGH_CURRENT_BITS(IOPORTC),
-        .LOCK = 0x0000,
-        .OUT = 0x0000,
-        .CFG[0] = AF_BITS(IOPORTC, 0),
-        .CFG[1] = AF_BITS(IOPORTC, 1),
-    },
+    .setup[2] =
+        {
+            .DIR = OUT_BITS(IOPORTC),
+            .INE = IN_BITS(IOPORTC),
+            .PU = IN_BITS(IOPORTC),
+            .PD = 0x0000,
+            .OD = 0x0000,
+            .DRV = HIGH_CURRENT_BITS(IOPORTC),
+            .LOCK = 0x0000,
+            .OUT = 0x0000,
+            .CFG[0] = AF_BITS(IOPORTC, 0),
+            .CFG[1] = AF_BITS(IOPORTC, 1),
+        },
     // GPIO D
-    .setup[3] = {
-        .DIR = OUT_BITS(IOPORTD),
-        .INE = IN_BITS(IOPORTD),
-        .PU = IN_BITS(IOPORTD),
-        .PD = 0x0000,
-        .OD = 0x0000,
-        .DRV = HIGH_CURRENT_BITS(IOPORTD),
-        .LOCK = 0x0000,
-        .OUT = 0x0000,
-        .CFG[0] = AF_BITS(IOPORTD, 0),
-        .CFG[1] = AF_BITS(IOPORTD, 1),
-    },
+    .setup[3] =
+        {
+            .DIR = OUT_BITS(IOPORTD),
+            .INE = IN_BITS(IOPORTD),
+            .PU = IN_BITS(IOPORTD),
+            .PD = 0x0000,
+            .OD = 0x0000,
+            .DRV = HIGH_CURRENT_BITS(IOPORTD),
+            .LOCK = 0x0000,
+            .OUT = 0x0000,
+            .CFG[0] = AF_BITS(IOPORTD, 0),
+            .CFG[1] = AF_BITS(IOPORTD, 1),
+        },
     .ESSR[0] = 0x00000000,
     .ESSR[1] = 0x00000000,
 };
 
-void __early_init(void) {
-    ht32_clock_init();
-}
+void __early_init(void) { ht32_clock_init(); }
 
 /**
  * @brief   Board-specific initialization code.
  * @todo    Add your board-specific code, if any.
  */
-void boardInit(void) {
-}
+void boardInit(void) {}

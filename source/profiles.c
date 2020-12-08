@@ -61,7 +61,8 @@ static uint8_t flowValue[NUM_COLUMN] = {0,  11, 22, 33,  44,  55,  66,
                                         77, 88, 99, 110, 121, 132, 143};
 void animatedRainbowFlow(led_t *currentKeyLedColors, uint8_t intensity) {
   for (int i = 0; i < NUM_COLUMN; i++) {
-    setColumnColorHSV(currentKeyLedColors, i, flowValue[i], 255, 125, intensity);
+    setColumnColorHSV(currentKeyLedColors, i, flowValue[i], 255, 125,
+                      intensity);
     if (flowValue[i] >= 179 && flowValue[i] < 240) {
       flowValue[i] = 240;
     }
@@ -106,33 +107,31 @@ void animatedSpectrum(led_t *currentKeyLedColors, uint8_t intensity) {
   spectrumValue += spectrumDirection;
 }
 
-static uint8_t waveValue[NUM_COLUMN] = {
-  0, 0, 0, 10, 15, 20, 25, 40, 55, 75, 100, 115,
-  135, 140
-};
-static int waveDirection[NUM_COLUMN] = {
-  3, 3, 3, 3, 3, 3, 3,
-  3, 3, 3, 3, 3, 3, 3
-};
-void animatedWave(led_t* currentKeyLedColors, uint8_t intensity){
-  for(int i = 0; i < NUM_COLUMN; i++){
+static uint8_t waveValue[NUM_COLUMN] = {0,  0,  0,  10,  15,  20,  25,
+                                        40, 55, 75, 100, 115, 135, 140};
+static int waveDirection[NUM_COLUMN] = {3, 3, 3, 3, 3, 3, 3,
+                                        3, 3, 3, 3, 3, 3, 3};
+void animatedWave(led_t *currentKeyLedColors, uint8_t intensity) {
+  for (int i = 0; i < NUM_COLUMN; i++) {
     if (waveValue[i] >= 140) {
       waveDirection[i] = -3;
-    } else if(waveValue[i] <= 10) {
+    } else if (waveValue[i] <= 10) {
       waveDirection[i] = 3;
     }
-    setColumnColorHSV(currentKeyLedColors, i, 190, 255, waveValue[i], intensity);
+    setColumnColorHSV(currentKeyLedColors, i, 190, 255, waveValue[i],
+                      intensity);
     waveValue[i] += waveDirection[i];
   }
 }
 
-uint8_t animatedPressedFadeBuf[NUM_ROW * NUM_COLUMN] = { 0 };
+uint8_t animatedPressedFadeBuf[NUM_ROW * NUM_COLUMN] = {0};
 
-void reactiveFade(led_t* ledColors, uint8_t intensity) {
+void reactiveFade(led_t *ledColors, uint8_t intensity) {
   for (int i = 0; i < NUM_ROW * NUM_COLUMN; i++) {
     if (animatedPressedFadeBuf[i] > 5) {
       animatedPressedFadeBuf[i] -= 5;
-      hsv2rgb(100 - animatedPressedFadeBuf[i], 255, 125, (uint8_t*)&ledColors[i]);
+      hsv2rgb(100 - animatedPressedFadeBuf[i], 255, 125,
+              (uint8_t *)&ledColors[i]);
       ledColors[i].red >>= intensity;
       ledColors[i].green >>= intensity;
       ledColors[i].blue >>= intensity;
@@ -145,7 +144,8 @@ void reactiveFade(led_t* ledColors, uint8_t intensity) {
   }
 }
 
-void reactiveFadeKeypress(led_t* ledColors, uint8_t row, uint8_t col, uint8_t intensity) {
+void reactiveFadeKeypress(led_t *ledColors, uint8_t row, uint8_t col,
+                          uint8_t intensity) {
   int i = row * NUM_COLUMN + col;
   animatedPressedFadeBuf[i] = 100;
   ledColors[i].green = 0;
@@ -153,7 +153,7 @@ void reactiveFadeKeypress(led_t* ledColors, uint8_t row, uint8_t col, uint8_t in
   ledColors[i].blue = 0;
 }
 
-void reactiveFadeInit(led_t* ledColors) {
+void reactiveFadeInit(led_t *ledColors) {
   memset(animatedPressedFadeBuf, 0, sizeof(animatedPressedFadeBuf));
   memset(ledColors, 0, NUM_ROW * NUM_COLUMN * 3);
 }

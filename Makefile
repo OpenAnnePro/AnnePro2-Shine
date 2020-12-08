@@ -199,6 +199,12 @@ include $(RULESPATH)/rules.mk
 # Custom rules
 #
 
+clang-format:
+	clang-format --style=LLVM -i *.c ./board/*.{c,h} ./source/*.{c,h}
+
+clang-format-ci:
+	clang-format --style=LLVM --Werror --dry-run *.c ./board/*.{c,h} ./source/*.{c,h}
+
 #
 # Custom rules
 ##############################################################################

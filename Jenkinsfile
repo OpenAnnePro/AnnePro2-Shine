@@ -1,6 +1,15 @@
 pipeline {
   agent any
   stages {
+    stage('Check style') {
+      agent {
+        label 'gcc-arm-none-eabi'
+      }
+      steps {
+        sh """make clang-format-ci"""
+      }
+    }
+
     stage('Build') {
       parallel {
         stage('Build C15') {
