@@ -23,10 +23,10 @@
 #include "profiles.h"
 #include "miniFastLED.h"
 
-static void columnCallback(GPTDriver* driver);
+static void mainCallback(GPTDriver* driver);
 static void animationCallback(GPTDriver* driver);
 static void executeMsg(msg_t msg);
-static void executeProfile(void);
+static void executeProfile(bool init);
 static void disableLeds(void);
 static void enableLeds(void);
 static void ledSet(void);
@@ -84,6 +84,8 @@ ioline_t ledRows[NUM_ROW * 4] = {
 
 #define KEY_COUNT                   70
 
+#define SERIAL_CHECK_FREQUENCY      4095
+
 #define LEN(a) (sizeof(a)/sizeof(*a))
 
 /*
@@ -102,13 +104,14 @@ typedef void (*profile_init)( led_t* colors );
 typedef struct {
   // callback function implementing the lighting effect
   lighting_callback callback;
-  // In case the lighting effect is animated, this contains 4 different frequencies
-  // which are passed in gptStartContinuous() and determine how often the function is called.
-  // 1 represents function being called every tick, and n represents being called only on
-  // every n-th tick (skipping other ticks).
-  // We do support 4 different speeds, and generally they go from slowest to fastest.
-  // For static effects, the array should contain {0, 0, 0, 0} which stops the GPT timer.
-  uint8_t animationSpeed[4];
+  // For static effects, their `callback` is called only once.
+  // For dynamic effects, their `callback` is called in a loop.
+  // This field controls the animation speed by specifying
+  // how many iterations of the loop to skip before calling this again.
+  // For example, 8000 in the array means that `callback` is called on every 8000th iteration.
+  // Different 4 values can be specified to allow different speeds of the same effect.
+  // For static effects, the array must contain {0, 0, 0, 0}.
+  uint16_t animationSpeed[4];
   // In case the profile is reactive, it responds to each keypress.
   // This callback is called with the locations of the pressed keys.
   keypress_handler keypressCallback;
@@ -123,41 +126,37 @@ profile profiles[12] = {
     { blue, {0, 0, 0, 0}, NULL, NULL },
     { rainbowHorizontal, {0, 0, 0, 0}, NULL, NULL },
     { rainbowVertical, {0, 0, 0, 0}, NULL, NULL },
-    { animatedRainbowVertical, {20, 10, 8, 5}, NULL, NULL },
-    { animatedRainbowFlow, {12, 6, 3, 1}, NULL, NULL },
-    { animatedRainbowWaterfall, {12, 6, 3, 1}, NULL, NULL },
-    { animatedBreathing, {12, 6, 3, 1}, NULL, NULL },
-    { animatedWave, {12, 6, 3, 1}, NULL, NULL },
-    { animatedSpectrum, {12, 6, 3, 1}, NULL, NULL },
-    { reactiveFade, {12, 6, 3, 1}, reactiveFadeKeypress, reactiveFadeInit },
+    { animatedRainbowVertical, {15000, 10000, 6000, 3000}, NULL, NULL },
+    { animatedRainbowFlow, {5000, 2000, 1000, 700}, NULL, NULL },
+    { animatedRainbowWaterfall, {8000, 6000, 4000, 2000}, NULL, NULL },
+    { animatedBreathing, {8000, 6000, 4000, 2000}, NULL, NULL },
+    { animatedWave, {6000, 4000, 2000, 1000}, NULL, NULL },
+    { animatedSpectrum, {8000, 6000, 4000, 2000}, NULL, NULL },
+    { reactiveFade, {8000, 6000, 4000, 2000}, reactiveFadeKeypress, reactiveFadeInit },
 };
 
 static uint8_t currentProfile = 0;
 static uint8_t amountOfProfiles = sizeof(profiles)/sizeof(profile);
 static uint8_t currentSpeed = 0;
+static uint16_t animationSkipIterations = 0;
 
 // each color from RGB is rightshifted by this amount
 // default zero corresponds to full intensity, max 3 correponds to 1/8 of color
 static uint8_t ledIntensity = 0;
+static bool ledEnabled = false;
 
 // Flag to check if there is a foreground color currently active
 static bool is_foregroundColor_set = false;
 
 uint8_t ledMasks[KEY_COUNT];
 led_t ledColors[KEY_COUNT];
-static uint32_t currentColumn = 0;
-static uint32_t columnPWMCount = 0;
+static uint8_t currentColumn = 0;
+static uint8_t columnPWMCount = 0;
 
-// BFTM0 Configuration, this runs at 15 * REFRESH_FREQUENCY Hz
+// BFTM0 Configuration, which specifies the frequency of the callback in Hz
 static const GPTConfig bftm0Config = {
-  .frequency = NUM_COLUMN * REFRESH_FREQUENCY * 2 * 16,
-  .callback = columnCallback
-};
-
-// Lighting animation refresh timer
-static const GPTConfig lightAnimationConfig = {
-  .frequency = ANIMATION_TIMER_FREQUENCY,
-  .callback = animationCallback
+  .frequency = NUM_COLUMN * REFRESH_FREQUENCY * 32,
+  .callback = mainCallback
 };
 
 static const SerialConfig usart1Config = {
@@ -166,23 +165,8 @@ static const SerialConfig usart1Config = {
 
 static uint8_t commandBuffer[64];
 
-void updateLightningTimer(void) {
-    uint8_t freq = profiles[currentProfile].animationSpeed[currentSpeed];
-    if (freq > 0) {
-      if (GPTD_BFTM1.state == GPT_CONTINUOUS) {
-        if (gptGetIntervalX(&GPTD_BFTM1) != freq) {
-          gptStopTimer(&GPTD_BFTM1);
-          gptStartContinuous(&GPTD_BFTM1, freq);
-        }
-      } else {
-        gptStartContinuous(&GPTD_BFTM1, freq);
-      }
-
-    } else if (GPTD_BFTM1.state == GPT_CONTINUOUS) {
-      gptStopTimer(&GPTD_BFTM1);
-    }
-    // Here we disable the foreground so the speed change is visible
-    is_foregroundColor_set = false;
+void updateAnimationSpeed(void) {
+    animationSkipIterations = profiles[currentProfile].animationSpeed[currentSpeed];
 }
 
 /*
@@ -202,7 +186,7 @@ void forwardReactiveFlag(void) {
 /*
  * Execute action based on a message
  */
-void executeMsg(msg_t msg) {
+static inline void executeMsg(msg_t msg) {
   switch (msg) {
     case CMD_LED_ON:
       enableLeds();
@@ -222,17 +206,14 @@ void executeMsg(msg_t msg) {
       break;
     case CMD_LED_NEXT_PROFILE:
       currentProfile = (currentProfile+1)%amountOfProfiles;
-      if (profiles[currentProfile].profileInit != NULL) {
-        profiles[currentProfile].profileInit(ledColors);
-      }
-      executeProfile();
-      updateLightningTimer();
       forwardReactiveFlag();
+      executeProfile(true);
+      updateAnimationSpeed();
       break;
     case CMD_LED_PREV_PROFILE:
       currentProfile = (currentProfile+(amountOfProfiles-1u))%amountOfProfiles;
-      executeProfile();
-      updateLightningTimer();
+      executeProfile(true);
+      updateAnimationSpeed();
       break;
     case CMD_LED_GET_PROFILE:
       sdWrite(&SD1, &currentProfile, 1);
@@ -276,14 +257,15 @@ void changeMask(uint8_t mask) {
 
 void nextIntensity() {
     ledIntensity = (ledIntensity + 1) % 4;
-    executeProfile();
+    executeProfile(false);
 }
 
 
 
 void nextSpeed() {
     currentSpeed = (currentSpeed + 1) % 4;
-    updateLightningTimer();
+    is_foregroundColor_set = false;
+    updateAnimationSpeed();
 }
 
 /*
@@ -314,9 +296,7 @@ void setForegroundColor(){
     uint32_t ForegroundColor = *(uint32_t*)&colorBytes;
     is_foregroundColor_set = true;
 
-    chSysLock();
     setAllKeysColor(ledColors, ForegroundColor, ledIntensity);
-    chSysUnlock();
   }
 }
 
@@ -330,11 +310,8 @@ void setProfile() {
   if (bytesRead == 1) {
     if (commandBuffer[0] < amountOfProfiles) {
       currentProfile = commandBuffer[0];
-      if (profiles[currentProfile].profileInit != NULL) {
-        profiles[currentProfile].profileInit(ledColors);
-      }
-      executeProfile();
-      updateLightningTimer();
+      executeProfile(true);
+      updateAnimationSpeed();
     }
   }
 }
@@ -342,26 +319,36 @@ void setProfile() {
 /*
  * Execute current profile
  */
-void executeProfile() {
-  chSysLock();
+void executeProfile(bool init) {
   // Here we disable the foreground to ensure the animation will run
   is_foregroundColor_set = false;
 
-  if (profiles[currentProfile].profileInit != NULL) {
+  if (init && profiles[currentProfile].profileInit != NULL) {
     profiles[currentProfile].profileInit(ledColors);
   }
   profiles[currentProfile].callback(ledColors, ledIntensity);
-  chSysUnlock();
 }
 
 /*
  * Turn off all leds
  */
 void disableLeds() {
+  ledEnabled = false;
   palClearLine(LINE_LED_PWR);
-  if (GPTD_BFTM1.state == GPT_CONTINUOUS) {
-    gptStopTimer(&GPTD_BFTM1);
+
+  // gptChangeInterval is unreliable, restarting because of that
+  gptStopTimer(&GPTD_BFTM0);
+  gptStartContinuous(&GPTD_BFTM0, SERIAL_CHECK_FREQUENCY);
+
+  for (int i = 0; i < NUM_ROW * 4; i++) {
+    if (i % 4 != 3) {
+      palClearLine(ledRows[i]);
+    }
   }
+  for (int i = 0; i < NUM_COLUMN; i++) {
+    palClearLine(ledColumns[i]);
+  }
+  animationSkipIterations = 0;
 }
 
 /*
@@ -371,9 +358,14 @@ void enableLeds() {
   if (profiles[currentProfile].profileInit != NULL) {
     profiles[currentProfile].profileInit(ledColors);
   }
+  ledEnabled = true;
+
+  gptStopTimer(&GPTD_BFTM0);
+  gptStartContinuous(&GPTD_BFTM0, 1);
+
   palSetLine(LINE_LED_PWR);
-  executeProfile();
-  updateLightningTimer();
+  executeProfile(true);
+  updateAnimationSpeed();
 }
 
 /*
@@ -414,41 +406,90 @@ void animationCallback(GPTDriver* _driver) {
   (void)_driver;
 
   // If the foreground is set we skip the animation as a way to avoid it overrides the foreground
-  if(!is_foregroundColor_set) {
+  if(!is_foregroundColor_set && profiles[currentProfile].animationSpeed[currentSpeed] > 0) {
     profiles[currentProfile].callback(ledColors, ledIntensity);
   }
 }
 
-inline void sPWM(uint8_t cycle, uint8_t currentCount, uint8_t start, ioline_t port) {
-  if (start+cycle>0xFF) start = 0xFF - cycle;
+static inline void sPWM(uint8_t cycle, uint8_t currentCount, uint8_t start, ioline_t port) {
+  if (start > 0xFF - cycle || cycle > 0xFF - start) {
+    start = 0xFF - cycle;
+  }
   if (start <= currentCount && currentCount < start+cycle)
     palSetLine(port);
   else
     palClearLine(port);
 }
 
-void columnCallback(GPTDriver* _driver) {
-  (void)_driver;
-  palClearLine(ledColumns[currentColumn]);
-  currentColumn = (currentColumn+1) % NUM_COLUMN;
-  if (columnPWMCount < 255) {
-    for (size_t row = 0; row < NUM_ROW; row++) {
-      const size_t ledIndex = currentColumn + (NUM_COLUMN * row);
-      const led_t keyLED = ledColors[ledIndex];
-      const uint8_t ledMask = ledMasks[ledIndex];
-      const uint8_t red = keyLED.red & ledMask;
-      const uint8_t green = keyLED.green & ledMask;
-      const uint8_t blue = keyLED.blue & ledMask;
+uint16_t animationSkipCounter = 0;
+uint16_t serialCheckCounter = 0;
 
-      sPWM(red, columnPWMCount, 0, ledRows[row << 2]);
-      sPWM(green, columnPWMCount, red, ledRows[(row << 2) | 1]);
-      sPWM(blue, columnPWMCount, red+green, ledRows[(row << 2) | 2]);
+void mainCallback(GPTDriver* _driver) {
+  (void)_driver;
+
+  serialCheckCounter++;
+  /*
+   * If leds are disabled, this callback is called less frequently,
+   * and we should check the serial queue on every iteration.
+   * If leds are enabled, this function is called very often, and we can
+   * skip the check most of the time.
+   */
+  if (!ledEnabled || serialCheckCounter >= SERIAL_CHECK_FREQUENCY) {
+    serialCheckCounter = 0;
+    /*
+     * sdGetWouldBlock(&SD1) can be used instead which wraps iqIsEmptyI
+     * with osalSysLock/osalSysUnlock.
+     * However, this check is done very frequently, and getting the wrong
+     * data sometimes is not dangerous.
+     *    If iqIsEmptyI returns TRUE, it means there is some data to be consumed.
+     *      This will never be wrong because there are no consumers of the queue
+     *      other than us. It updates from TRUE to FALSE only synchronously as
+     *      a side effect of us calling `sdGet` within the loop.
+     *    If iqIsEmptyI returns FALSE, the queue might be indeed empty or it might
+     *      have just received a message and we missed it. However, we will get it
+     *      in the next call to columnCallback, which is safe.
+     * Therefore, the check is done without locking to speed up this function.
+     */
+    while (!iqIsEmptyI(&SD1.iqueue)) {
+      msg_t msg;
+      msg = sdGet(&SD1);
+      if (msg >= MSG_OK) {
+        executeMsg(msg);
+      }
     }
-    columnPWMCount++;
-  } else {
-    columnPWMCount = 0;
   }
-  palSetLine(ledColumns[currentColumn]);
+
+  if (ledEnabled) {
+    // column PWM logic
+    palClearLine(ledColumns[currentColumn]);
+    currentColumn = (currentColumn+1) % NUM_COLUMN;
+    if (columnPWMCount < 255) {
+      for (size_t row = 0; row < NUM_ROW; row++) {
+        const size_t ledIndex = currentColumn + (NUM_COLUMN * row);
+        const led_t keyLED = ledColors[ledIndex];
+        const uint8_t ledMask = ledMasks[ledIndex];
+        const uint8_t red = keyLED.red & ledMask;
+        const uint8_t green = keyLED.green & ledMask;
+        const uint8_t blue = keyLED.blue & ledMask;
+
+        sPWM(red, columnPWMCount, 0, ledRows[row << 2]);
+        sPWM(green, columnPWMCount, red, ledRows[(row << 2) | 1]);
+        sPWM(blue, columnPWMCount, red + green, ledRows[(row << 2) | 2]);
+      }
+      columnPWMCount++;
+    } else {
+      columnPWMCount = 0;
+    }
+    palSetLine(ledColumns[currentColumn]);
+
+
+    // animation update logic
+    animationSkipCounter++;
+    if (animationSkipIterations > 0 && animationSkipCounter >= animationSkipIterations) {
+      animationCallback(_driver);
+      animationSkipCounter = 0;
+    }
+  }
 }
 
 /*
@@ -466,28 +507,21 @@ int main(void) {
   chSysInit();
 
   profiles[currentProfile].callback(ledColors, ledIntensity);
+  updateAnimationSpeed();
 
   // Setup masks to all be 0xFF at the start
-  for (size_t i = 0; i < KEY_COUNT; ++i)
-  {
-    ledMasks[i] = 0xFF;
-  }
+  memset(ledMasks, 0xFF, sizeof(ledMasks));
 
   palClearLine(LINE_LED_PWR);
   sdStart(&SD1, &usart1Config);
 
   // Setup Column Multiplex Timer
   gptStart(&GPTD_BFTM0, &bftm0Config);
-  gptStartContinuous(&GPTD_BFTM0, 1);
+  gptStartContinuous(&GPTD_BFTM0, SERIAL_CHECK_FREQUENCY);
 
-  // Setup Animation Timer
-  gptStart(&GPTD_BFTM1, &lightAnimationConfig);
-
+  // idle loop, copied form lib/chibios/os/rt/src/chsys.c
   while (true) {
-    msg_t msg;
-    msg = sdGet(&SD1);
-    if (msg >= MSG_OK) {
-      executeMsg(msg);
-    }
+    port_wait_for_interrupt();
+    CH_CFG_IDLE_LOOP_HOOK();
   }
 }
