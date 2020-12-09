@@ -200,10 +200,10 @@ include $(RULESPATH)/rules.mk
 #
 
 clang-format:
-	clang-format --style=LLVM -i *.c ./board/*.{c,h} ./source/*.{c,h}
+	clang-format --style=LLVM -i *.c ./board/*.c ./board/*.h ./source/*.c ./source/*.h
 
 clang-format-ci:
-	clang-format --style=LLVM --Werror --dry-run *.c ./board/*.{c,h} ./source/*.{c,h}
+	clang-format --style=LLVM --Werror --dry-run *.c ./board/*.c ./board/*.h ./source/*.c ./source/*.h
 
 #
 # Custom rules
