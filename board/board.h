@@ -22,16 +22,17 @@
 
 #ifdef C18
 #define ANNEPRO2_C18
-#define BOARD_NAME                  "Anne Pro 2 C18"
+#define BOARD_NAME "Anne Pro 2 C18"
 #else
 #define ANNEPRO2_C15
-#define BOARD_NAME                  "Anne Pro 2 C15"
+#define BOARD_NAME "Anne Pro 2 C15"
 #endif
 
 #define HT32F52342
 
-#define FLASH_SIZE 0x10000 - 0x4000      // 64kB - 16kB
+#define FLASH_SIZE 0x10000 - 0x4000 // 64kB - 16kB
 
+// clang-format off
 /*
  * I/O
  */
@@ -116,12 +117,13 @@
 #define LINE_LED_ROW_5_B                                   PAL_LINE(IOPORTC,  6)
 #endif
 
+// clang-format on
 
 #if !defined(_FROM_ASM_)
 #ifdef __cplusplus
 extern "C" {
 #endif
-    void boardInit(void);
+void boardInit(void);
 #ifdef __cplusplus
 }
 #endif
