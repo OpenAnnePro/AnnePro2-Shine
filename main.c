@@ -96,13 +96,14 @@ typedef struct {
   profile_init profileInit;
 } profile;
 
-profile profiles[12] = {
+profile profiles[13] = {
     {red, {0, 0, 0, 0}, NULL, NULL},
     {green, {0, 0, 0, 0}, NULL, NULL},
     {blue, {0, 0, 0, 0}, NULL, NULL},
     {rainbowHorizontal, {0, 0, 0, 0}, NULL, NULL},
     {rainbowVertical, {0, 0, 0, 0}, NULL, NULL},
     {animatedRainbowVertical, {15000, 10000, 6000, 3000}, NULL, NULL},
+    {christmasLights, {15000, 10000, 6000, 3000}, NULL, NULL},
     {animatedRainbowFlow, {5000, 2000, 1000, 700}, NULL, NULL},
     {animatedRainbowWaterfall, {8000, 6000, 4000, 2000}, NULL, NULL},
     {animatedBreathing, {8000, 6000, 4000, 2000}, NULL, NULL},
