@@ -57,6 +57,21 @@ void animatedRainbowVertical(led_t *currentKeyLedColors, uint8_t intensity) {
   colAnimOffset = (colAnimOffset + 1) % LEN(colorPalette);
 }
 
+void christmasLights(led_t *currentKeyLedColors, uint8_t intensity) {
+  //sets of red and green to be alternated
+  uint32_t christmasCol[] = {0xFF0000, 0xFF0000, 0xFF0000, 0x008000,
+    0x008000, 0x008000, 0x008000};
+  for (uint16_t i = 0; i < NUM_COLUMN; ++i) {
+    for (uint16_t j = 0; j < NUM_ROW; ++j) {
+      setKeyColor(&currentKeyLedColors[j * NUM_COLUMN + i],
+                  christmasCol[(i + colAnimOffset) % LEN(christmasCol)],
+                  intensity);
+    }
+  }
+  colAnimOffset = (colAnimOffset + 1) % LEN(christmasCol);
+}
+
+
 static uint8_t flowValue[NUM_COLUMN] = {0,  11, 22, 33,  44,  55,  66,
                                         77, 88, 99, 110, 121, 132, 143};
 void animatedRainbowFlow(led_t *currentKeyLedColors, uint8_t intensity) {

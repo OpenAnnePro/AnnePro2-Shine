@@ -14,6 +14,7 @@ void miamiNights(led_t *currentKeyLedColors, uint8_t intensity);
  * ANIMATED
  */
 void animatedRainbowVertical(led_t *currentKeyLedColors, uint8_t intensity);
+void christmasLights(led_t *currentKeyLedColors, uint8_t intensity);
 void animatedRainbowFlow(led_t *currentKeyLedColors, uint8_t intensity);
 void animatedRainbowWaterfall(led_t *currentKeyLedColors, uint8_t intensity);
 void animatedBreathing(led_t *currentKeyLedColors, uint8_t intensity);
