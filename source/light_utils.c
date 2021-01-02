@@ -50,7 +50,7 @@ void setModKeysColor(led_t *ledColors, uint32_t color, uint8_t intensity) {
 }
 
 // Set specific key color
-void setKeyColor(led_t *key, uint32_t color, uint8_t intensity) {
+inline void setKeyColor(led_t *key, uint32_t color, uint8_t intensity) {
   key->red = ((color >> 16) & 0xFF) >> intensity;
   key->green = ((color >> 8) & 0xFF) >> intensity;
   key->blue = (color & 0xFF) >> intensity;

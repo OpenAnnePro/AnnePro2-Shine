@@ -23,8 +23,7 @@
 #include "profiles.h"
 #include "string.h"
 
-static void mainCallback(GPTDriver *driver);
-static void animationCallback(GPTDriver *driver);
+static void animationCallback(void);
 static void executeMsg(msg_t msg);
 static void executeProfile(bool init);
 static void disableLeds(void);
@@ -66,7 +65,7 @@ ioline_t ledRows[NUM_ROW * 4] = {
  * Active profiles
  * Add profiles from source/profiles.h in the profile array
  */
-typedef void (*lighting_callback)(led_t *, uint8_t);
+typedef bool (*lighting_callback)(led_t *, uint8_t);
 
 /*
  * keypress handler
@@ -82,9 +81,9 @@ typedef struct {
   // For static effects, their `callback` is called only once.
   // For dynamic effects, their `callback` is called in a loop.
   // This field controls the animation speed by specifying
-  // how many iterations of the loop to skip before calling this again.
+  // how many ticks to skip before calling the callback again.
   // For example, 8000 in the array means that `callback` is called on every
-  // 8000th iteration. Different 4 values can be specified to allow different
+  // 8000th tick. Different 4 values can be specified to allow different
   // speeds of the same effect. For static effects, the array must contain {0,
   // 0, 0, 0}.
   uint16_t animationSpeed[4];
@@ -102,14 +101,14 @@ profile profiles[12] = {
     {blue, {0, 0, 0, 0}, NULL, NULL},
     {rainbowHorizontal, {0, 0, 0, 0}, NULL, NULL},
     {rainbowVertical, {0, 0, 0, 0}, NULL, NULL},
-    {animatedRainbowVertical, {15000, 10000, 6000, 3000}, NULL, NULL},
-    {animatedRainbowFlow, {5000, 2000, 1000, 700}, NULL, NULL},
-    {animatedRainbowWaterfall, {8000, 6000, 4000, 2000}, NULL, NULL},
-    {animatedBreathing, {8000, 6000, 4000, 2000}, NULL, NULL},
-    {animatedWave, {6000, 4000, 2000, 1000}, NULL, NULL},
-    {animatedSpectrum, {8000, 6000, 4000, 2000}, NULL, NULL},
+    {animatedRainbowVertical, {3000, 2000, 1200, 600}, NULL, NULL},
+    {animatedRainbowFlow, {1000, 400, 200, 140}, NULL, NULL},
+    {animatedRainbowWaterfall, {1600, 1200, 800, 400}, NULL, NULL},
+    {animatedBreathing, {1600, 1200, 800, 400}, NULL, NULL},
+    {animatedWave, {1200, 800, 400, 200}, NULL, NULL},
+    {animatedSpectrum, {1600, 1200, 800, 400}, NULL, NULL},
     {reactiveFade,
-     {8000, 6000, 4000, 2000},
+     {400, 1600, 1200, 800},
      reactiveFadeKeypress,
      reactiveFadeInit},
 };
@@ -117,32 +116,36 @@ profile profiles[12] = {
 static uint8_t currentProfile = 0;
 static uint8_t amountOfProfiles = sizeof(profiles) / sizeof(profile);
 static uint8_t currentSpeed = 0;
-static uint16_t animationSkipIterations = 0;
+static uint16_t animationSkipTicks = 0;
+
+static binary_semaphore_t ledDisabledSem;
 
 // each color from RGB is rightshifted by this amount
 // default zero corresponds to full intensity, max 3 correponds to 1/8 of color
 static uint8_t ledIntensity = 0;
-static bool ledEnabled = false;
+
+static volatile bool ledEnabled = false;
+
+// If the current profile is animated but the animation callback does not need
+// to be called, this flag is set to false. The only use case for now is with
+// reactiveFade profile when there are no LEDs to be enabled. This suspends the
+// current thread which should reduce power draw.
+static volatile bool reactiveNeedsUpdate = false;
 
 // Flag to check if there is a foreground color currently active
 static bool is_foregroundColor_set = false;
 
 uint8_t ledMasks[KEY_COUNT];
 led_t ledColors[KEY_COUNT];
-static uint8_t currentColumn = 0;
-static uint8_t columnPWMCount = 0;
-
-// BFTM0 Configuration, which specifies the frequency of the callback in Hz
-static const GPTConfig bftm0Config = {
-    .frequency = NUM_COLUMN * REFRESH_FREQUENCY * 32, .callback = mainCallback};
+static uint16_t currentRow = 0;
 
 static const SerialConfig usart1Config = {.speed = 115200};
 
 static uint8_t commandBuffer[64];
+static uint32_t enableRow = 0;
 
 void updateAnimationSpeed(void) {
-  animationSkipIterations =
-      profiles[currentProfile].animationSpeed[currentSpeed];
+  animationSkipTicks = profiles[currentProfile].animationSpeed[currentSpeed];
 }
 
 /*
@@ -255,6 +258,10 @@ inline void handleKeypress(msg_t msg) {
   keypress_handler handler = profiles[currentProfile].keypressCallback;
   if (handler != NULL) {
     handler(ledColors, row, col, ledIntensity);
+    if (!reactiveNeedsUpdate && ledEnabled) {
+      reactiveNeedsUpdate = true;
+      chBSemReset(&ledDisabledSem, true);
+    }
   }
 }
 
@@ -301,7 +308,8 @@ void executeProfile(bool init) {
   if (init && profiles[currentProfile].profileInit != NULL) {
     profiles[currentProfile].profileInit(ledColors);
   }
-  profiles[currentProfile].callback(ledColors, ledIntensity);
+  reactiveNeedsUpdate =
+      profiles[currentProfile].callback(ledColors, ledIntensity);
 }
 
 /*
@@ -309,11 +317,11 @@ void executeProfile(bool init) {
  */
 void disableLeds() {
   ledEnabled = false;
-  palClearLine(LINE_LED_PWR);
+  reactiveNeedsUpdate = false;
 
-  // gptChangeInterval is unreliable, restarting because of that
-  gptStopTimer(&GPTD_BFTM0);
-  gptStartContinuous(&GPTD_BFTM0, SERIAL_CHECK_FREQUENCY);
+  chBSemReset(&ledDisabledSem, true);
+
+  palClearLine(LINE_LED_PWR);
 
   for (int i = 0; i < NUM_ROW * 4; i++) {
     if (i % 4 != 3) {
@@ -323,20 +331,15 @@ void disableLeds() {
   for (int i = 0; i < NUM_COLUMN; i++) {
     palClearLine(ledColumns[i]);
   }
-  animationSkipIterations = 0;
 }
 
 /*
  * Turn on all leds
  */
 void enableLeds() {
-  if (profiles[currentProfile].profileInit != NULL) {
-    profiles[currentProfile].profileInit(ledColors);
-  }
   ledEnabled = true;
 
-  gptStopTimer(&GPTD_BFTM0);
-  gptStartContinuous(&GPTD_BFTM0, 1);
+  chBSemReset(&ledDisabledSem, false);
 
   palSetLine(LINE_LED_PWR);
   executeProfile(true);
@@ -379,95 +382,45 @@ inline uint8_t min(uint8_t a, uint8_t b) { return a <= b ? a : b; }
 /*
  * Update lighting table as per animation
  */
-void animationCallback(GPTDriver *_driver) {
-  (void)_driver;
+static inline void animationCallback() {
 
   // If the foreground is set we skip the animation as a way to avoid it
   // overrides the foreground
   if (!is_foregroundColor_set &&
       profiles[currentProfile].animationSpeed[currentSpeed] > 0) {
-    profiles[currentProfile].callback(ledColors, ledIntensity);
+    reactiveNeedsUpdate =
+        profiles[currentProfile].callback(ledColors, ledIntensity);
+
+    if (!reactiveNeedsUpdate) {
+      chBSemReset(&ledDisabledSem, true);
+    }
+  } else {
+    reactiveNeedsUpdate = false;
   }
 }
 
-static inline void sPWM(uint8_t cycle, uint8_t currentCount, uint8_t start,
-                        ioline_t port) {
-  if (start > 0xFF - cycle || cycle > 0xFF - start) {
-    start = 0xFF - cycle;
-  }
-  if (start <= currentCount && currentCount < start + cycle)
+static inline void sPWM(uint8_t cycle, uint8_t currentCount, ioline_t port) {
+  if (cycle > currentCount) {
+    enableRow = true;
     palSetLine(port);
-  else
+  } else {
     palClearLine(port);
+  }
 }
 
-uint16_t animationSkipCounter = 0;
-uint16_t serialCheckCounter = 0;
+uint32_t animationLastCallTime = 0;
 
-void mainCallback(GPTDriver *_driver) {
-  (void)_driver;
+uint8_t rowPWMCount = 0;
 
-  serialCheckCounter++;
-  /*
-   * If leds are disabled, this callback is called less frequently,
-   * and we should check the serial queue on every iteration.
-   * If leds are enabled, this function is called very often, and we can
-   * skip the check most of the time.
-   */
-  if (!ledEnabled || serialCheckCounter >= SERIAL_CHECK_FREQUENCY) {
-    serialCheckCounter = 0;
-    /*
-     * sdGetWouldBlock(&SD1) can be used instead which wraps iqIsEmptyI
-     * with osalSysLock/osalSysUnlock.
-     * However, this check is done very frequently, and getting the wrong
-     * data sometimes is not dangerous.
-     *    If iqIsEmptyI returns TRUE, it means there is some data to be
-     * consumed. This will never be wrong because there are no consumers of the
-     * queue other than us. It updates from TRUE to FALSE only synchronously as
-     *      a side effect of us calling `sdGet` within the loop.
-     *    If iqIsEmptyI returns FALSE, the queue might be indeed empty or it
-     * might have just received a message and we missed it. However, we will get
-     * it in the next call to columnCallback, which is safe. Therefore, the
-     * check is done without locking to speed up this function.
-     */
-    while (!iqIsEmptyI(&SD1.iqueue)) {
-      msg_t msg;
-      msg = sdGet(&SD1);
-      if (msg >= MSG_OK) {
-        executeMsg(msg);
-      }
-    }
-  }
+THD_WORKING_AREA(waThread1, 128);
+__attribute__((noreturn)) THD_FUNCTION(MsgHandlerThd, arg) {
+  (void)arg;
 
-  if (ledEnabled) {
-    // column PWM logic
-    palClearLine(ledColumns[currentColumn]);
-    currentColumn = (currentColumn + 1) % NUM_COLUMN;
-    if (columnPWMCount < 255) {
-      for (size_t row = 0; row < NUM_ROW; row++) {
-        const size_t ledIndex = currentColumn + (NUM_COLUMN * row);
-        const led_t keyLED = ledColors[ledIndex];
-        const uint8_t ledMask = ledMasks[ledIndex];
-        const uint8_t red = keyLED.red & ledMask;
-        const uint8_t green = keyLED.green & ledMask;
-        const uint8_t blue = keyLED.blue & ledMask;
-
-        sPWM(red, columnPWMCount, 0, ledRows[row << 2]);
-        sPWM(green, columnPWMCount, red, ledRows[(row << 2) | 1]);
-        sPWM(blue, columnPWMCount, red + green, ledRows[(row << 2) | 2]);
-      }
-      columnPWMCount++;
-    } else {
-      columnPWMCount = 0;
-    }
-    palSetLine(ledColumns[currentColumn]);
-
-    // animation update logic
-    animationSkipCounter++;
-    if (animationSkipIterations > 0 &&
-        animationSkipCounter >= animationSkipIterations) {
-      animationCallback(_driver);
-      animationSkipCounter = 0;
+  while (true) {
+    msg_t msg;
+    msg = sdGet(&SD1);
+    if (msg >= MSG_OK) {
+      executeMsg(msg);
     }
   }
 }
@@ -486,22 +439,82 @@ int main(void) {
   halInit();
   chSysInit();
 
-  profiles[currentProfile].callback(ledColors, ledIntensity);
+  /* profiles[currentProfile].callback(ledColors, ledIntensity); */
   updateAnimationSpeed();
 
   // Setup masks to all be 0xFF at the start
   memset(ledMasks, 0xFF, sizeof(ledMasks));
 
+  chBSemObjectInit(&ledDisabledSem, true);
+
   palClearLine(LINE_LED_PWR);
   sdStart(&SD1, &usart1Config);
 
-  // Setup Column Multiplex Timer
-  gptStart(&GPTD_BFTM0, &bftm0Config);
-  gptStartContinuous(&GPTD_BFTM0, SERIAL_CHECK_FREQUENCY);
+  chThdCreateStatic(waThread1, sizeof(waThread1), HIGHPRIO, MsgHandlerThd,
+                    NULL);
 
-  // idle loop, copied form lib/chibios/os/rt/src/chsys.c
   while (true) {
-    port_wait_for_interrupt();
-    CH_CFG_IDLE_LOOP_HOOK();
+
+    // If leds are disabled or enabled and using a reactive profile which does
+    // not need any update, suspend the thread on the semaphore. The semaphore
+    // is flagged up in MsgHandlerThd when leds are enabled or user clicks any
+    // button with the reactive profile enabled.
+    if (!ledEnabled || !reactiveNeedsUpdate) {
+      chBSemWait(&ledDisabledSem);
+    } else {
+      if (enableRow) {
+        palClearLine(ledRows[currentRow]);
+      }
+
+      enableRow = false;
+      currentRow = (currentRow + 1) % (NUM_ROW * 4);
+      if (currentRow % 4 == 3) {
+        currentRow = (currentRow + 1) % (NUM_ROW * 4);
+      }
+
+      // A hack to potentially improve the flicker. If we increment by 1 and
+      // the color intensity is small, for example 5, we will have 5 iterations
+      // with LED enabled and 251 iterations with LED disabled. Number 63 is
+      // chosen to randomize the distribution of set iterations and such that
+      // uint8_t with wrap-around would not repeat until exhausting all unique
+      // numbers.
+      rowPWMCount += 63;
+
+      for (size_t col = 0; col < NUM_COLUMN; col++) {
+
+        const size_t ledIndex = col + (NUM_COLUMN * (currentRow >> 2));
+
+        const led_t keyLED = ledColors[ledIndex];
+        uint8_t cl;
+        uint8_t delta;
+        if (currentRow % 4 == 0) {
+          cl = keyLED.red;
+          delta = 0;
+        } else if (currentRow % 4 == 1) {
+          cl = keyLED.green;
+          delta = 85;
+        } else {
+          cl = keyLED.blue;
+          delta = 190;
+        }
+        sPWM(cl, rowPWMCount + delta, ledColumns[col]);
+      }
+
+      if (enableRow) {
+        palSetLine(ledRows[currentRow]);
+        chThdSleep(1);
+      }
+
+      // animation update logic
+      if (animationSkipTicks > 0) {
+        systime_t curTime = chVTGetSystemTimeX();
+        // curTime wraps around when overflows, hence the check for "less"
+        if (curTime < animationLastCallTime ||
+            curTime - animationLastCallTime >= animationSkipTicks) {
+          animationCallback();
+          animationLastCallTime = curTime;
+        }
+      }
+    }
   }
 }
