@@ -7,7 +7,7 @@
 /*
     #define HSV specifics
 */
-#define APPLY_DIMMING(X) (X)
+#define APPLY_DIMMING(X, Y) ((X) >> (Y))
 #define HSV_SECTION_6 (0x20)
 #define HSV_SECTION_3 (0x40)
 
@@ -15,19 +15,20 @@
 uint8_t rgbArray[3];
 
 // Convert HSV to RGB and write results to rgbResults
-void hsv2rgb(uint8_t hue, uint8_t sat, uint8_t val, uint8_t *rgbResults) {
+void hsv2rgb(uint8_t hue, uint8_t sat, uint8_t val, uint8_t *rgbResults,
+             uint8_t intensity) {
 
   // Convert hue, saturation and brightness ( HSV/HSB ) to RGB
   // "Dimming" is used on saturation and brightness to make
   // the output more visually linear.
 
   // Apply dimming curves
-  uint8_t value = APPLY_DIMMING(val);
+  uint8_t value = APPLY_DIMMING(val, intensity);
   uint8_t saturation = sat;
 
   // The brightness floor is minimum number that all of
   // R, G, and B will be set to.
-  uint8_t invsat = APPLY_DIMMING(255 - saturation);
+  uint8_t invsat = APPLY_DIMMING(255 - saturation, intensity);
   uint8_t brightness_floor = (value * invsat) / 256;
 
   // The color amplitude is the maximum amount of R, G, and B
@@ -105,13 +106,13 @@ void setAllKeysColorHSV(led_t *ledColors, uint8_t hue, uint8_t sat, uint8_t val,
                         uint8_t intensity) {
 
   // Convert hsv to rgb
-  hsv2rgb(hue, sat, val, rgbArray);
+  hsv2rgb(hue, sat, val, rgbArray, intensity);
 
   // Set key colors
   for (uint16_t i = 0; i < NUM_COLUMN * NUM_ROW; ++i) {
-    ledColors[i].red = rgbArray[0] >> intensity;
-    ledColors[i].green = rgbArray[1] >> intensity;
-    ledColors[i].blue = rgbArray[2] >> intensity;
+    ledColors[i].red = rgbArray[0];
+    ledColors[i].green = rgbArray[1];
+    ledColors[i].blue = rgbArray[2];
   }
 }
 
@@ -120,14 +121,14 @@ void setColumnColorHSV(led_t *ledColors, uint8_t column, uint8_t hue,
                        uint8_t sat, uint8_t val, uint8_t intensity) {
 
   // Convert hsv to rgb
-  hsv2rgb(hue, sat, val, rgbArray);
+  hsv2rgb(hue, sat, val, rgbArray, intensity);
 
   // Set column key color
   for (uint16_t i = 0; i < NUM_ROW; ++i) {
     // section 1: 0x40..0x7F
-    ledColors[i * NUM_COLUMN + column].red = rgbArray[0] >> intensity;
-    ledColors[i * NUM_COLUMN + column].green = rgbArray[1] >> intensity;
-    ledColors[i * NUM_COLUMN + column].blue = rgbArray[2] >> intensity;
+    ledColors[i * NUM_COLUMN + column].red = rgbArray[0];
+    ledColors[i * NUM_COLUMN + column].green = rgbArray[1];
+    ledColors[i * NUM_COLUMN + column].blue = rgbArray[2];
   }
 }
 
@@ -136,13 +137,13 @@ void setRowColorHSV(led_t *ledColors, uint8_t row, uint8_t hue, uint8_t sat,
                     uint8_t val, uint8_t intensity) {
 
   // Convert hsv to rgb
-  hsv2rgb(hue, sat, val, rgbArray);
+  hsv2rgb(hue, sat, val, rgbArray, intensity);
 
   // Set column key color
   for (uint16_t i = 0; i < NUM_COLUMN; ++i) {
     // section 1: 0x40..0x7F
-    ledColors[row * NUM_COLUMN + i].red = rgbArray[0] >> intensity;
-    ledColors[row * NUM_COLUMN + i].green = rgbArray[1] >> intensity;
-    ledColors[row * NUM_COLUMN + i].blue = rgbArray[2] >> intensity;
+    ledColors[row * NUM_COLUMN + i].red = rgbArray[0];
+    ledColors[row * NUM_COLUMN + i].green = rgbArray[1];
+    ledColors[row * NUM_COLUMN + i].blue = rgbArray[2];
   }
 }

@@ -5,7 +5,7 @@
 // An array of basic colors used accross different lighting profiles
 // static const uint32_t colorPalette[] = {0xFF0000, 0xF0F00, 0x00F00, 0x00F0F,
 // 0x0000F, 0xF000F, 0x50F0F};
-static const uint32_t colorPalette[] = {0xcc0000, 0xccc900, 0x5fcc00, 0x00c7cc,
+static const uint32_t colorPalette[] = {0xcc0000, 0xcccc00, 0x5fcc00, 0x00c7cc,
                                         0x006ecc, 0x0033ff, 0x6900cc, 0xcc00bf};
 
 #define LEN(a) (sizeof(a) / sizeof(*a))
@@ -34,8 +34,8 @@ bool miamiNights(led_t *currentKeyLedColors, uint8_t intensity) {
 bool rainbowHorizontal(led_t *currentKeyLedColors, uint8_t intensity) {
   for (uint16_t i = 0; i < NUM_ROW; ++i) {
     for (uint16_t j = 0; j < NUM_COLUMN; ++j) {
-      setKeyColor(&currentKeyLedColors[i * NUM_COLUMN + j],
-                  colorPalette[i % LEN(colorPalette)], intensity);
+      setKeyColor(&currentKeyLedColors[i * NUM_COLUMN + j], colorPalette[i],
+                  intensity);
     }
   }
   return true;
@@ -136,25 +136,22 @@ bool animatedWave(led_t *currentKeyLedColors, uint8_t intensity) {
   return true;
 }
 
-uint8_t animatedPressedFadeBuf[NUM_ROW * NUM_COLUMN] = {0};
+uint8_t animatedPressedBuf[NUM_ROW * NUM_COLUMN] = {0};
 
 bool reactiveFade(led_t *ledColors, uint8_t intensity) {
   bool shouldUpdate = false;
   for (int i = 0; i < NUM_ROW * NUM_COLUMN; i++) {
-    if (animatedPressedFadeBuf[i] > 5) {
+    if (animatedPressedBuf[i] > 5) {
       shouldUpdate = true;
-      animatedPressedFadeBuf[i] -= 5;
-      hsv2rgb(100 - animatedPressedFadeBuf[i], 255, 225,
-              (uint8_t *)&ledColors[i]);
-      ledColors[i].red >>= intensity;
-      ledColors[i].green >>= intensity;
-      ledColors[i].blue >>= intensity;
-    } else if (animatedPressedFadeBuf[i] > 0) {
+      animatedPressedBuf[i] -= 5;
+      hsv2rgb(100 - animatedPressedBuf[i], 255, 225, (uint8_t *)&ledColors[i],
+              intensity);
+    } else if (animatedPressedBuf[i] > 0) {
       shouldUpdate = true;
       ledColors[i].blue = 0;
       ledColors[i].red = 0;
       ledColors[i].green = 0;
-      animatedPressedFadeBuf[i] = 0;
+      animatedPressedBuf[i] = 0;
     }
   }
   return shouldUpdate;
@@ -163,7 +160,7 @@ bool reactiveFade(led_t *ledColors, uint8_t intensity) {
 void reactiveFadeKeypress(led_t *ledColors, uint8_t row, uint8_t col,
                           uint8_t intensity) {
   int i = row * NUM_COLUMN + col;
-  animatedPressedFadeBuf[i] = 100;
+  animatedPressedBuf[i] = 100;
   ledColors[i].green = 0;
   ledColors[i].red = 0xFF >> intensity;
   ledColors[i].blue = 0;
@@ -174,8 +171,52 @@ void reactiveFadeInit(led_t *ledColors) {
   // that this profile is activated
   for (int i = 0; i < NUM_ROW; i++) {
     for (int j = 0; j < NUM_COLUMN; j++) {
-      animatedPressedFadeBuf[i * NUM_COLUMN + j] = i * 15 + 25;
+      animatedPressedBuf[i * NUM_COLUMN + j] = i * 15 + 25;
     }
+  }
+  memset(ledColors, 0, NUM_ROW * NUM_COLUMN * 3);
+}
+
+uint8_t pulseBuf[NUM_ROW];
+
+bool reactivePulse(led_t *ledColors, uint8_t intensity) {
+  bool shouldUpdate = false;
+  uint8_t pulseSpeed = 16;
+
+  for (int i = 0; i < NUM_ROW; i++) {
+    if (pulseBuf[i] > 80) {
+      shouldUpdate = true;
+      pulseBuf[i] -= pulseSpeed;
+    } else if (pulseBuf[i] > pulseSpeed) {
+      shouldUpdate = true;
+      for (int j = 0; j < NUM_COLUMN; j++) {
+        ledColors[i * NUM_COLUMN + j].blue = (175 + pulseBuf[i]) >> intensity;
+      }
+      pulseBuf[i] -= pulseSpeed;
+    } else if (pulseBuf[i] > 0) {
+      shouldUpdate = true;
+      pulseBuf[i] = 0;
+      for (int j = 0; j < NUM_COLUMN; j++) {
+        ledColors[i * NUM_COLUMN + j].blue = 0;
+      }
+    }
+  }
+
+  return shouldUpdate;
+}
+
+void reactivePulseKeypress(led_t *ledColors, uint8_t row, uint8_t col,
+                           uint8_t intensity) {
+  (void)ledColors;
+  (void)intensity;
+  (void)col;
+
+  pulseBuf[row] = 80;
+}
+
+void reactivePulseInit(led_t *ledColors) {
+  for (int i = 0; i < NUM_ROW; i++) {
+    pulseBuf[i] = 80 + i * 5;
   }
   memset(ledColors, 0, NUM_ROW * NUM_COLUMN * 3);
 }

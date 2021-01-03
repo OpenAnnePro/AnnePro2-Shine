@@ -50,15 +50,15 @@
  * Peripheral driver settings
  */
 
-#define HT32_GPT_USE_BFTM0                  FALSE
-#define HT32_GPT_BFTM0_IRQ_PRIORITY         3
+#define HT32_GPT_USE_BFTM0                  TRUE
+#define HT32_GPT_BFTM0_IRQ_PRIORITY         1
 
 #define HT32_SERIAL_USE_USART0              FALSE
 #define HT32_SERIAL_USE_USART1              TRUE
 #define HT32_USART1_IRQ_PRIORITY            2
 
 #define HT32_GPT_USE_BFTM1                  FALSE
-#define HT32_GPT_BFTM1_IRQ_PRIORITY         3
+#define HT32_GPT_BFTM1_IRQ_PRIORITY         0
 /*
  * USB driver settings
  */
