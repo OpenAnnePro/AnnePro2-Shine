@@ -385,7 +385,7 @@ inline uint8_t min(uint8_t a, uint8_t b) { return a <= b ? a : b; }
 static inline void animationCallback() {
   // If the foreground is set we skip the animation as a way to avoid it
   // overrides the foreground
-  if(is_foregroundColor_set){
+  if (is_foregroundColor_set) {
     return;
   }
 
