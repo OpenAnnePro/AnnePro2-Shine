@@ -95,7 +95,7 @@ typedef struct {
   profile_init profileInit;
 } profile;
 
-profile profiles[12] = {
+profile profiles[] = {
     {red, {0, 0, 0, 0}, NULL, NULL},
     {green, {0, 0, 0, 0}, NULL, NULL},
     {blue, {0, 0, 0, 0}, NULL, NULL},
@@ -383,11 +383,13 @@ inline uint8_t min(uint8_t a, uint8_t b) { return a <= b ? a : b; }
  * Update lighting table as per animation
  */
 static inline void animationCallback() {
-
   // If the foreground is set we skip the animation as a way to avoid it
   // overrides the foreground
-  if (!is_foregroundColor_set &&
-      profiles[currentProfile].animationSpeed[currentSpeed] > 0) {
+  if (is_foregroundColor_set) {
+    return;
+  }
+
+  if (profiles[currentProfile].animationSpeed[currentSpeed] > 0) {
     reactiveNeedsUpdate =
         profiles[currentProfile].callback(ledColors, ledIntensity);
 
