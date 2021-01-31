@@ -36,6 +36,7 @@ static void nextIntensity(void);
 static void nextSpeed(void);
 static void setForegroundColor(void);
 static void handleKeypress(msg_t msg);
+static void setIAP(void);
 
 ioline_t ledColumns[NUM_COLUMN] = {
     LINE_LED_COL_1,  LINE_LED_COL_2,  LINE_LED_COL_3,  LINE_LED_COL_4,
@@ -216,12 +217,24 @@ static inline void executeMsg(msg_t msg) {
   case CMD_LED_SET_FOREGROUND_COLOR:
     setForegroundColor();
     break;
+  case CMD_LED_IAP:
+    setIAP();
+    break;
   default:
     if (msg & 0b10000000) {
       handleKeypress(msg);
     }
     break;
   }
+}
+
+void setIAP() {
+
+  // Magic key to set keyboard to IAP
+  *((uint32_t *)0x20001ffc) = 0x0000fab2;
+
+  __disable_irq();
+  NVIC_SystemReset();
 }
 
 void changeMask(uint8_t mask) {
