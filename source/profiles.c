@@ -149,7 +149,7 @@ bool reactiveFade(led_t *ledColors, uint8_t intensity) {
       ledColors[i].red >>= intensity;
       ledColors[i].green >>= intensity;
       ledColors[i].blue >>= intensity;
-    } else if (animatedPressedFadeBuf[i] > 0) {
+    } else {
       shouldUpdate = true;
       ledColors[i].blue = 0;
       ledColors[i].red = 0;
