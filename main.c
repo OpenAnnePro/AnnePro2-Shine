@@ -26,7 +26,7 @@
 static void animationCallback(void);
 static void executeMsg(msg_t msg);
 static void executeProfile(uint8_t profile_idx, bool init);
-static void disableLeds(bool reactive);
+static void disableLeds(void);
 static void enableLeds(bool initProfile);
 static void ledSet(void);
 static void ledSetRow(void);
@@ -35,6 +35,7 @@ static void changeMask(uint8_t mask);
 static void nextIntensity(void);
 static void nextSpeed(void);
 static void setForegroundColor(void);
+static void clearForegroundColor(void);
 static void handleKeypress(msg_t msg);
 static void setIAP(void);
 static void mainCallback(GPTDriver *_driver);
@@ -63,7 +64,7 @@ ioline_t ledRows[NUM_ROW * 4] = {
  * Active profiles
  * Add profiles from source/profiles.h in the profile array
  */
-typedef bool (*lighting_callback)(led_t *, uint8_t);
+typedef void (*lighting_callback)(led_t *, uint8_t);
 
 /*
  * keypress handler
@@ -131,14 +132,9 @@ static uint8_t ledIntensity = 0;
 
 static volatile bool ledEnabled = false;
 
-// If the current profile is animated but the animation callback does not need
-// to be called, this flag is set to false. This is useful for reactive profiles
-// that don't light up LEDs when user does not type anything. When disabled it
-// stops the GPT interval which should reduce power draw.
-static volatile bool profileLedActive = false;
-
 // Flag to check if there is a foreground color currently active
-static bool is_foregroundColor_set = false;
+static bool foregroundColorSet = false;
+static uint32_t foregroundColor = 0;
 
 uint8_t ledMasks[KEY_COUNT];
 led_t ledColors[KEY_COUNT];
@@ -174,9 +170,10 @@ static inline void executeMsg(msg_t msg) {
   switch (msg) {
   case CMD_LED_ON:
     enableLeds(true);
+    forwardReactiveFlag();
     break;
   case CMD_LED_OFF:
-    disableLeds(false);
+    disableLeds();
     break;
   case CMD_LED_SET:
     ledSet();
@@ -195,6 +192,7 @@ static inline void executeMsg(msg_t msg) {
   case CMD_LED_PREV_PROFILE:
     executeProfile(
         (currentProfile + (amountOfProfiles - 1u)) % amountOfProfiles, true);
+    forwardReactiveFlag();
     break;
   case CMD_LED_GET_PROFILE:
     sdWrite(&SD1, &currentProfile, 1);
@@ -216,6 +214,10 @@ static inline void executeMsg(msg_t msg) {
     break;
   case CMD_LED_SET_FOREGROUND_COLOR:
     setForegroundColor();
+    break;
+  case CMD_LED_CLEAR_FOREGROUND_COLOR:
+    clearForegroundColor();
+    forwardReactiveFlag();
     break;
   case CMD_LED_IAP:
     setIAP();
@@ -255,7 +257,7 @@ void nextIntensity() {
 
 void nextSpeed() {
   currentSpeed = (currentSpeed + 1) % 4;
-  is_foregroundColor_set = false;
+  foregroundColorSet = false;
   updateAnimationSpeed();
 }
 
@@ -271,10 +273,6 @@ inline void handleKeypress(msg_t msg) {
   keypress_handler handler = profiles[currentProfile].keypressCallback;
   if (handler != NULL && row < NUM_ROW && col < NUM_COLUMN) {
     handler(ledColors, row, col, ledIntensity);
-    if (ledEnabled && !profileLedActive) {
-      profileLedActive = true;
-      enableLeds(false);
-    }
   }
 }
 
@@ -283,16 +281,26 @@ inline void handleKeypress(msg_t msg) {
  */
 void setForegroundColor() {
   size_t bytesRead;
-  bytesRead = sdReadTimeout(&SD1, commandBuffer, 3, 10000);
+  bytesRead = sdRead(&SD1, commandBuffer, 3);
 
   if (bytesRead >= 3) {
     uint8_t colorBytes[4] = {commandBuffer[2], commandBuffer[1],
                              commandBuffer[0], 0x00};
-    uint32_t ForegroundColor = *(uint32_t *)&colorBytes;
-    is_foregroundColor_set = true;
+    foregroundColor = *(uint32_t *)&colorBytes;
+    foregroundColorSet = true;
 
-    setAllKeysColor(ledColors, ForegroundColor, ledIntensity);
+    setAllKeysColor(ledColors, foregroundColor, ledIntensity);
   }
+}
+
+// In case we switched to a new profile, the mainCallback
+// should call the profile handler initially when this flag is set to true.
+bool needToCallbackProfile = false;
+
+void clearForegroundColor() {
+  foregroundColorSet = false;
+  memset(ledColors, 0, sizeof(ledColors));
+  needToCallbackProfile = true;
 }
 
 /*
@@ -304,57 +312,46 @@ void setProfile() {
 
   if (bytesRead == 1) {
     if (commandBuffer[0] < amountOfProfiles) {
-      executeProfile(commandBuffer[0], true);
+      foregroundColorSet = false;
+      executeProfile(commandBuffer[0], commandBuffer[0] != currentProfile);
     }
   }
 }
-
-// In case we switched to a new profile, the mainCallback
-// should call the profile handler initially when this flag is set to true.
-bool needToCallbackProfile = false;
 
 /*
  * Execute current profile
  */
 void executeProfile(uint8_t profileIdx, bool init) {
-  // Here we disable the foreground to ensure the animation will run
-  is_foregroundColor_set = false;
+  if (currentProfile == profileIdx && foregroundColorSet) {
+    setAllKeysColor(ledColors, foregroundColor, ledIntensity);
+  } else {
+    // Here we disable the foreground to ensure the animation will run
+    foregroundColorSet = false;
 
-  updateAnimationSpeed();
+    updateAnimationSpeed();
 
-  profile_init pinit = profiles[profileIdx].profileInit;
-  if (init && pinit != NULL) {
-    pinit(ledColors);
+    profile_init pinit = profiles[profileIdx].profileInit;
+    if (init && pinit != NULL) {
+      pinit(ledColors);
+    }
+
+    // set the currentProfile later because this value is used by the GPT
+    // interval callback and profile_init callback should prepare some data
+    // before the new profile can be used.
+    currentProfile = profileIdx;
+
+    needToCallbackProfile = true;
   }
-
-  profileLedActive = true;
-  // set the currentProfile later because this value is used by the GPT
-  // interval callback and profile_init callback should prepare some data
-  // before the new profile can be used.
-  currentProfile = profileIdx;
-
-  needToCallbackProfile = true;
 }
 
 /*
  * Turn off all leds
  */
-static inline void disableLeds(bool reactive) {
-
-  // If this function was called due to reactive callback having no active LEDs
-  // and current profile switching to a static profile (animationSkipTicks = 0),
-  // don't do anything.
-  if (reactive && animationSkipTicks == 0) {
-    return;
-  }
+static inline void disableLeds() {
 
   chMtxLock(&mtx);
 
-  if (reactive) {
-    profileLedActive = false;
-  } else {
-    ledEnabled = false;
-  }
+  ledEnabled = false;
 
   // stop timer, clock is still enabled
   if (GPTD_BFTM0.state == GPT_CONTINUOUS) {
@@ -385,18 +382,13 @@ static inline void disableLeds(bool reactive) {
 static inline void enableLeds(bool initProfile) {
   chMtxLock(&mtx);
   ledEnabled = true;
-  profileLedActive = true;
 
   executeProfile(currentProfile, initProfile);
   palSetLine(LINE_LED_PWR);
 
-  if (GPTD_BFTM0.state == GPT_STOP) {
-    gptStart(&GPTD_BFTM0, &bftm0Config);
-  }
-
-  if (GPTD_BFTM0.state == GPT_READY) {
-    gptStartContinuous(&GPTD_BFTM0, 1);
-  }
+  // start PWM handling interval
+  gptStart(&GPTD_BFTM0, &bftm0Config);
+  gptStartContinuous(&GPTD_BFTM0, 1);
 
   chMtxUnlock(&mtx);
 }
@@ -441,19 +433,11 @@ static inline void animationCallback() {
 
   // If the foreground is set we skip the animation as a way to avoid it
   // overrides the foreground
-  if (is_foregroundColor_set) {
+  if (foregroundColorSet) {
     return;
   }
 
-  bool oldProfileLedActive = profileLedActive;
-  profileLedActive = profiles[currentProfile].callback(ledColors, ledIntensity);
-  if (oldProfileLedActive != profileLedActive) {
-    if (profileLedActive) {
-      enableLeds(false);
-    } else {
-      disableLeds(true);
-    }
-  }
+  profiles[currentProfile].callback(ledColors, ledIntensity);
 }
 
 static inline void sPWM(uint8_t cycle, uint8_t currentCount, ioline_t port) {
@@ -472,17 +456,13 @@ uint8_t rowPWMCount = 0;
 void mainCallback(GPTDriver *_driver) {
   (void)_driver;
 
-  // If LEDs are disabled or the current profile does not need to light up LEDs
-  // (for example with reactive profiles with user inactivity),
-  // this interval will be stopped by a call to disableLeds
-  if (ledEnabled && profileLedActive) {
+  if (ledEnabled) {
 
     palClearLine(ledColumns[currentCol]);
 
     if (needToCallbackProfile) {
       needToCallbackProfile = false;
-      profileLedActive =
-          profiles[currentProfile].callback(ledColors, ledIntensity);
+      profiles[currentProfile].callback(ledColors, ledIntensity);
     } else {
       bool animationCalled = false;
       if (animationSkipTicks > 0) {
