@@ -300,8 +300,15 @@ bool needToCallbackProfile = false;
 
 void clearForegroundColor() {
   foregroundColorSet = false;
-  memset(ledColors, 0, sizeof(ledColors));
-  needToCallbackProfile = true;
+
+  /* Check if current profile is reactive. If it is, clear the colors. Not doing
+   * it will keep the foreground color if it is a reactive profile This might
+   * cause a split blackout with reactive profiles in the future if they have
+   * also have static colors/animation.
+   */
+  if (profiles[currentProfile].keypressCallback != NULL) {
+    memset(ledColors, 0, sizeof(ledColors));
+  }
 }
 
 /*
