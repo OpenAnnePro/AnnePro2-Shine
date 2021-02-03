@@ -25,9 +25,9 @@
 
 static void animationCallback(void);
 static void executeMsg(msg_t msg);
-static void executeProfile(uint8_t profile_idx, bool init);
+static void executeProfile(bool init);
 static void disableLeds(void);
-static void enableLeds(bool initProfile);
+static void enableLeds(void);
 static void ledSet(void);
 static void ledSetRow(void);
 static void setProfile(void);
@@ -169,8 +169,7 @@ void forwardReactiveFlag(void) {
 static inline void executeMsg(msg_t msg) {
   switch (msg) {
   case CMD_LED_ON:
-    enableLeds(true);
-    forwardReactiveFlag();
+    enableLeds();
     break;
   case CMD_LED_OFF:
     disableLeds();
@@ -186,12 +185,14 @@ static inline void executeMsg(msg_t msg) {
     forwardReactiveFlag();
     break;
   case CMD_LED_NEXT_PROFILE:
-    executeProfile((currentProfile + 1) % amountOfProfiles, true);
+    currentProfile = (currentProfile + 1) % amountOfProfiles;
+    executeProfile(true);
     forwardReactiveFlag();
     break;
   case CMD_LED_PREV_PROFILE:
-    executeProfile(
-        (currentProfile + (amountOfProfiles - 1u)) % amountOfProfiles, true);
+    currentProfile =
+        (currentProfile + (amountOfProfiles - 1u)) % amountOfProfiles;
+    executeProfile(true);
     forwardReactiveFlag();
     break;
   case CMD_LED_GET_PROFILE:
@@ -252,7 +253,7 @@ void changeMask(uint8_t mask) {
 
 void nextIntensity() {
   ledIntensity = (ledIntensity + 1) % 4;
-  executeProfile(currentProfile, false);
+  executeProfile(false);
 }
 
 void nextSpeed() {
@@ -313,7 +314,8 @@ void setProfile() {
   if (bytesRead == 1) {
     if (commandBuffer[0] < amountOfProfiles) {
       foregroundColorSet = false;
-      executeProfile(commandBuffer[0], commandBuffer[0] != currentProfile);
+      currentProfile = commandBuffer[0];
+      executeProfile(true);
     }
   }
 }
@@ -321,27 +323,18 @@ void setProfile() {
 /*
  * Execute current profile
  */
-void executeProfile(uint8_t profileIdx, bool init) {
-  if (currentProfile == profileIdx && foregroundColorSet) {
-    setAllKeysColor(ledColors, foregroundColor, ledIntensity);
-  } else {
-    // Here we disable the foreground to ensure the animation will run
-    foregroundColorSet = false;
+void executeProfile(bool init) {
+  // Here we disable the foreground to ensure the animation will run
+  foregroundColorSet = false;
 
-    updateAnimationSpeed();
-
-    profile_init pinit = profiles[profileIdx].profileInit;
-    if (init && pinit != NULL) {
-      pinit(ledColors);
-    }
-
-    // set the currentProfile later because this value is used by the GPT
-    // interval callback and profile_init callback should prepare some data
-    // before the new profile can be used.
-    currentProfile = profileIdx;
-
-    needToCallbackProfile = true;
+  profile_init pinit = profiles[currentProfile].profileInit;
+  if (init && pinit != NULL) {
+    pinit(ledColors);
   }
+
+  updateAnimationSpeed();
+
+  needToCallbackProfile = true;
 }
 
 /*
@@ -379,11 +372,11 @@ static inline void disableLeds() {
 /*
  * Turn on all leds
  */
-static inline void enableLeds(bool initProfile) {
+static inline void enableLeds(void) {
   chMtxLock(&mtx);
   ledEnabled = true;
 
-  executeProfile(currentProfile, initProfile);
+  executeProfile(true);
   palSetLine(LINE_LED_PWR);
 
   // start PWM handling interval
