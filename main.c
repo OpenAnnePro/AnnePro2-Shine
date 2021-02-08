@@ -443,8 +443,6 @@ static inline void animationCallback() {
 static inline void sPWM(uint8_t cycle, uint8_t currentCount, ioline_t port) {
   if (cycle > currentCount) {
     palSetLine(port);
-  } else {
-    palClearLine(port);
   }
 }
 
@@ -459,6 +457,11 @@ void mainCallback(GPTDriver *_driver) {
   if (ledEnabled) {
 
     palClearLine(ledColumns[currentCol]);
+    for (int i = 0; i < NUM_ROW * 4; i++) {
+      if (i % 4 != 3) {
+        palClearLine(ledRows[i]);
+      }
+    }
 
     if (needToCallbackProfile) {
       needToCallbackProfile = false;
