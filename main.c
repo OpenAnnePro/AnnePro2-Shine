@@ -38,6 +38,8 @@ static void setForegroundColor(void);
 static void clearForegroundColor(void);
 static void handleKeypress(msg_t msg);
 static void setIAP(void);
+static void pwmRowDimmer(void);
+static void pwmNextColumn(void);
 static void mainCallback(GPTDriver *_driver);
 
 ioline_t ledColumns[NUM_COLUMN] = {
@@ -46,12 +48,16 @@ ioline_t ledColumns[NUM_COLUMN] = {
     LINE_LED_COL_9,  LINE_LED_COL_10, LINE_LED_COL_11, LINE_LED_COL_12,
     LINE_LED_COL_13, LINE_LED_COL_14};
 
-ioline_t ledRows[NUM_ROW * 4] = {
-    LINE_LED_ROW_1_R, LINE_LED_ROW_1_G, LINE_LED_ROW_1_B, 0,
-    LINE_LED_ROW_2_R, LINE_LED_ROW_2_G, LINE_LED_ROW_2_B, 0,
-    LINE_LED_ROW_3_R, LINE_LED_ROW_3_G, LINE_LED_ROW_3_B, 0,
-    LINE_LED_ROW_4_R, LINE_LED_ROW_4_G, LINE_LED_ROW_4_B, 0,
-    LINE_LED_ROW_5_R, LINE_LED_ROW_5_G, LINE_LED_ROW_5_B, 0,
+ioline_t ledRows[NUM_ROW * 3] = {
+    LINE_LED_ROW_1_R, LINE_LED_ROW_1_G, LINE_LED_ROW_1_B,
+
+    LINE_LED_ROW_2_R, LINE_LED_ROW_2_G, LINE_LED_ROW_2_B,
+
+    LINE_LED_ROW_3_R, LINE_LED_ROW_3_G, LINE_LED_ROW_3_B,
+
+    LINE_LED_ROW_4_R, LINE_LED_ROW_4_G, LINE_LED_ROW_4_B,
+
+    LINE_LED_ROW_5_R, LINE_LED_ROW_5_G, LINE_LED_ROW_5_B,
 };
 
 #define KEY_COUNT 70
@@ -119,13 +125,28 @@ static volatile uint8_t currentSpeed = 0;
 static volatile uint16_t animationSkipTicks = 0;
 static uint32_t animationLastCallTime = 0;
 
-static const GPTConfig bftm0Config = {.frequency = 25000,
+/*
+   Original firmware reference:
+   ~9.81ms column cycle measured -> 100Hz.
+
+   During each column cycle the row is "strobed" 3 - 32 times (measured on white
+   with different intensity settings). This wastes some shining time, but limits
+   the current.
+
+   The row strobing is done at around 70kHz.
+
+   We would like to achieve more colors than the original firmware.
+
+   80kHz with pwmCounterLimit=80 will scan 14 columns at 71.4Hz - enough for
+   smooth animations, and allows for 6bit LED brightness control.
+ */
+static const GPTConfig bftm0Config = {.frequency = 80000,
                                       .callback = mainCallback};
 
 static mutex_t mtx;
 
-// each color from RGB is rightshifted by this amount
-// default zero corresponds to full intensity, max 3 correponds to 1/8 of color
+// Default zero corresponds to full intensity. Each color has the intensity
+// decreased linearly with this setting by the PWM loop.
 static uint8_t ledIntensity = 0;
 
 static volatile bool ledEnabled = false;
@@ -136,7 +157,8 @@ static uint32_t foregroundColor = 0;
 
 uint8_t ledMasks[KEY_COUNT];
 led_t ledColors[KEY_COUNT];
-static uint16_t currentCol = 0;
+
+static uint8_t currentColumn = 0;
 
 static const SerialConfig usart1Config = {.speed = 115200};
 
@@ -367,10 +389,8 @@ static inline void disableLeds() {
 
   palClearLine(LINE_LED_PWR);
 
-  for (int i = 0; i < NUM_ROW * 4; i++) {
-    if (i % 4 != 3) {
-      palClearLine(ledRows[i]);
-    }
+  for (int ledRow = 0; ledRow < NUM_ROW * 3; ledRow++) {
+    palClearLine(ledRows[ledRow]);
   }
   for (int i = 0; i < NUM_COLUMN; i++) {
     palClearLine(ledColumns[i]);
@@ -387,6 +407,7 @@ static inline void enableLeds(void) {
   ledEnabled = true;
 
   executeProfile(true);
+
   palSetLine(LINE_LED_PWR);
 
   // start PWM handling interval
@@ -441,13 +462,70 @@ static inline void animationCallback() {
   profiles[currentProfile].callback(ledColors);
 }
 
-static inline void sPWM(uint8_t cycle, uint8_t currentCount, ioline_t port) {
-  if (cycle > currentCount) {
-    palSetLine(port);
+/*
+ * Time each row has left to shine within the current column cycle.
+ * Row1 R-G-B, Row2 R-G-B, Row3 R-G-B, ...
+ */
+uint8_t rowTimes[NUM_ROW * 3];
+
+/*
+ * pwmCounter which counts time of lit rows within each column cycle.
+ */
+uint16_t pwmCounter;
+
+/*
+ * pwmCounter goes over 64 a bit to limit the current of completely white
+ * board (0.5A) vs <0.3A for original firmware.
+ *
+ * You can get brighter LEDs if you set this to 64. And possibly burn the
+ * board in the longer period of time.
+ */
+const uint16_t pwmCounterLimit = 80;
+
+/* Disable timeouted LEDs */
+static inline void pwmRowDimmer() {
+  for (size_t ledRow = 0; ledRow < NUM_ROW * 3; ledRow++) {
+    const uint8_t time = rowTimes[ledRow];
+    if (pwmCounter == time) {
+      palClearLine(ledRows[ledRow]);
+    }
   }
 }
 
-uint8_t rowPWMCount = 0;
+/* Start new PWM cycle */
+static inline void pwmNextColumn() {
+  /* Disable previously lit column */
+  palClearLine(ledColumns[currentColumn]);
+
+  currentColumn = (currentColumn + 1) % NUM_COLUMN;
+
+  /* TODO: Minimum intensity per animation? For some, the darkness doesn't work
+     well (rainbow) */
+  const uint8_t intensityDecrease = ledIntensity * 8;
+
+  /* Prepare the PWM data and enable leds for non-zero colors */
+  for (size_t keyRow = 0; keyRow < NUM_ROW; keyRow++) {
+    const uint8_t ledIndex = currentColumn + NUM_COLUMN * keyRow;
+    const led_t cl = ledColors[ledIndex];
+
+    for (size_t colorIdx = 0; colorIdx < 3; colorIdx++) {
+      const uint8_t ledRow = 3 * keyRow + colorIdx;
+      /* >>2 to decrease the color resolution from 0-255 to 0-63 */
+      uint8_t color = cl.pv[2 - colorIdx] >> 2;
+      if (intensityDecrease >= color) {
+        color = 0;
+      } else {
+        color -= intensityDecrease;
+        /* Each led is enabled for color>0 even for a short while. */
+        palSetLine(ledRows[ledRow]);
+      }
+      rowTimes[ledRow] = color;
+    }
+  }
+
+  /* Enable the current LED column */
+  palSetLine(ledColumns[currentColumn]);
+}
 
 // mainCallback is responsible for 2 things:
 // * software PWM
@@ -455,65 +533,40 @@ uint8_t rowPWMCount = 0;
 void mainCallback(GPTDriver *_driver) {
   (void)_driver;
 
-  if (ledEnabled) {
+  if (!ledEnabled) {
+    return;
+  }
 
-    palClearLine(ledColumns[currentCol]);
-    for (int i = 0; i < NUM_ROW * 4; i++) {
-      if (i % 4 != 3) {
-        palClearLine(ledRows[i]);
-      }
-    }
+  pwmCounter += 1;
+  if (pwmCounter < pwmCounterLimit) {
+    pwmRowDimmer();
+    return;
+  }
 
-    if (needToCallbackProfile) {
-      needToCallbackProfile = false;
-      profiles[currentProfile].callback(ledColors);
-    } else {
-      bool animationCalled = false;
-      if (animationSkipTicks > 0) {
-        // animation update logic
-        uint32_t curTime = chVTGetSystemTimeX();
-        // curTime wraps around when overflows, hence the check for "less"
-        if (curTime < animationLastCallTime ||
-            curTime - animationLastCallTime >= animationSkipTicks) {
-          animationCalled = true;
-          animationCallback();
-          animationLastCallTime = curTime;
-        }
-      }
-      if (!animationCalled) {
-        currentCol = (currentCol + 1) % NUM_COLUMN;
+  /* This time handle profile callback */
+  if (needToCallbackProfile) {
+    needToCallbackProfile = false;
+    profiles[currentProfile].callback(ledColors);
+  }
 
-        rowPWMCount += 63;
-        if (rowPWMCount == 255) {
-          rowPWMCount += 63;
-        }
-
-        for (size_t row = 0; row < NUM_ROW * 4 - 1; row++) {
-          if (row % 4 != 3) {
-            const size_t ledIndex = currentCol + (NUM_COLUMN * (row / 4));
-
-            const led_t keyLED = ledColors[ledIndex];
-            uint8_t cl;
-            uint8_t delta = 0;
-
-            if (row % 4 == 0) {
-              cl = keyLED.p.red;
-              delta = 0;
-            } else if (row % 4 == 1) {
-              cl = keyLED.p.green;
-              delta = 85;
-            } else {
-              cl = keyLED.p.blue;
-              delta = 170;
-            }
-            sPWM(cl, rowPWMCount + delta, ledRows[row]);
-          }
-
-          palSetLine(ledColumns[currentCol]);
-        }
-      }
+  /* TODO: Tie to the column cycle to limit possible "shearing" */
+  if (animationSkipTicks > 0) {
+    // animation update logic
+    uint32_t curTime = chVTGetSystemTimeX();
+    // curTime wraps around when overflows, hence the check for "less"
+    // FIXME: I believe the unsigned arithmetic can transparently handle the
+    // wrap case.
+    if (curTime < animationLastCallTime ||
+        curTime - animationLastCallTime >= animationSkipTicks) {
+      animationCallback();
+      animationLastCallTime = curTime;
     }
   }
+
+  /* We start a new PWM column cycle with leds enabled per-row. */
+  pwmCounter = 0;
+
+  pwmNextColumn();
 }
 
 /*
