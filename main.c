@@ -92,6 +92,7 @@ typedef struct {
 } profile;
 
 profile profiles[] = {
+    /* {colorBleed, {0, 0, 0, 0}, NULL, NULL}, */
     {red, {0, 0, 0, 0}, NULL, NULL},
     {green, {0, 0, 0, 0}, NULL, NULL},
     {blue, {0, 0, 0, 0}, NULL, NULL},

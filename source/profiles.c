@@ -22,6 +22,45 @@ void blue(led_t *currentKeyLedColors) {
   setAllKeysColor(currentKeyLedColors, 0x0000FF);
 }
 
+/* Color bleed test pattern */
+void colorBleed(led_t *currentKeyLedColors) {
+  for (uint16_t c = 0; c < NUM_COLUMN; ++c) {
+    for (uint16_t r = 0; r < NUM_ROW; ++r) {
+      const uint16_t i = c + NUM_COLUMN * r;
+      if (c == 0) {
+        if (r <= 3)
+          currentKeyLedColors[i].rgb = 0x0000FF;
+        else
+          currentKeyLedColors[i].rgb = 0xFF0000;
+        continue;
+      }
+      if (r == 0) {
+        if (c <= 10)
+          currentKeyLedColors[i].rgb = 0x0000FF;
+        else
+          currentKeyLedColors[i].rgb = 0xFF0000;
+        continue;
+      }
+
+      switch (i % 3) {
+      case 0:
+        currentKeyLedColors[i].rgb = 0x0000FF;
+        break;
+      case 1:
+        currentKeyLedColors[i].rgb = 0x00FF00;
+        break;
+      case 2:
+        currentKeyLedColors[i].rgb = 0xFF0000;
+        break;
+      }
+    }
+  }
+}
+
+void white(led_t *currentKeyLedColors) {
+  /* To get "white" you need to compensate for red/blue switches on board */
+  setAllKeysColor(currentKeyLedColors, 0xAAFFFF);
+}
 
 void miamiNights(led_t *currentKeyLedColors) {
   setAllKeysColor(currentKeyLedColors, 0x00979c);
