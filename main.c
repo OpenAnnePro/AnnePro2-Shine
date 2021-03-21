@@ -82,12 +82,14 @@ typedef struct {
   lighting_callback callback;
   // For static effects, their `callback` is called only once.
   // For dynamic effects, their `callback` is called in a loop.
-  // This field controls the animation speed by specifying
-  // how many ticks to skip before calling the callback again.
-  // For example, 8000 in the array means that `callback` is called on every
-  // 8000th tick. Different 4 values can be specified to allow different
-  // speeds of the same effect. For static effects, the array must contain {0,
-  // 0, 0, 0}.
+  //
+  // This field controls the animation speed by specifying how many LED refresh
+  // cycles to skip before calling the callback again. For example, 1 in the
+  // array means that `callback` is called on every cycle, ie. ~71Hz on default
+  // settings.
+  //
+  // Different 4 values can be specified to allow different speeds of the same
+  // effect. For static effects, the array must contain {0, 0, 0, 0}.
   uint16_t animationSpeed[4];
   // In case the profile is reactive, it responds to each keypress.
   // This callback is called with the locations of the pressed keys.
@@ -104,26 +106,27 @@ profile profiles[] = {
     {blue, {0, 0, 0, 0}, NULL, NULL},
     {rainbowHorizontal, {0, 0, 0, 0}, NULL, NULL},
     {rainbowVertical, {0, 0, 0, 0}, NULL, NULL},
-    {animatedRainbowVertical, {3000, 2000, 1200, 600}, NULL, NULL},
-    {animatedRainbowFlow, {1000, 400, 200, 140}, NULL, NULL},
-    {animatedRainbowWaterfall, {1600, 1200, 800, 400}, NULL, NULL},
-    {animatedBreathing, {1600, 1200, 800, 400}, NULL, NULL},
-    {animatedWave, {1200, 800, 400, 200}, NULL, NULL},
-    {animatedSpectrum, {1600, 1200, 800, 400}, NULL, NULL},
-    {reactiveFade,
-     {400, 1600, 1200, 800},
-     reactiveFadeKeypress,
-     reactiveFadeInit},
+    {animatedRainbowVertical, {500, 400, 300, 200}, NULL, NULL},
+    {animatedRainbowFlow, {100, 65, 30, 15}, NULL, NULL},
+    {animatedRainbowWaterfall, {100, 65, 30, 15}, NULL, NULL},
+    {animatedBreathing, {35, 20, 10}, NULL, NULL},
+    {animatedWave, {32, 28, 24, 22}, NULL, NULL},
+    {animatedSpectrum, {150, 90, 60, 25}, NULL, NULL},
+    {reactiveFade, {50, 35, 30, 10}, reactiveFadeKeypress, reactiveFadeInit},
     {reactivePulse,
-     {400, 1600, 1200, 800},
+     {50, 35, 30, 10},
      reactivePulseKeypress,
      reactivePulseInit}};
 
 static uint8_t currentProfile = 0;
 static const uint8_t amountOfProfiles = sizeof(profiles) / sizeof(profile);
 static volatile uint8_t currentSpeed = 0;
+
+/* If non-zero the animation is enabled; 1 is full speed */
 static volatile uint16_t animationSkipTicks = 0;
-static uint32_t animationLastCallTime = 0;
+
+/* Animation tick counter used to slow down animations */
+static uint16_t animationTicks = 0;
 
 /*
    Original firmware reference:
@@ -166,7 +169,7 @@ static uint8_t commandBuffer[64];
 
 void updateAnimationSpeed(void) {
   animationSkipTicks = profiles[currentProfile].animationSpeed[currentSpeed];
-  animationLastCallTime = 0;
+  animationTicks = 0;
 }
 
 /*
@@ -543,27 +546,25 @@ void mainCallback(GPTDriver *_driver) {
     return;
   }
 
-  /* This time handle profile callback */
+  /* Update profile if required before starting new cycle */
   if (needToCallbackProfile) {
     needToCallbackProfile = false;
     profiles[currentProfile].callback(ledColors);
   }
 
-  /* TODO: Tie to the column cycle to limit possible "shearing" */
+  /* Animation can be updated after each full column cycle. On
+   * pwmCounterLimit=80 + 80kHz timer this refreshes at 80kHz/80/14 = 71Hz and
+   * should be a sensible maximum speed for a fluent smooth animation.
+   */
   if (animationSkipTicks > 0) {
-    // animation update logic
-    uint32_t curTime = chVTGetSystemTimeX();
-    // curTime wraps around when overflows, hence the check for "less"
-    // FIXME: I believe the unsigned arithmetic can transparently handle the
-    // wrap case.
-    if (curTime < animationLastCallTime ||
-        curTime - animationLastCallTime >= animationSkipTicks) {
+    animationTicks++;
+    if (animationTicks >= animationSkipTicks) {
+      animationTicks = 0;
       animationCallback();
-      animationLastCallTime = curTime;
     }
   }
 
-  /* We start a new PWM column cycle with leds enabled per-row. */
+  /* We start a new PWM column cycle. */
   pwmCounter = 0;
 
   pwmNextColumn();

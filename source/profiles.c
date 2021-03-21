@@ -124,9 +124,9 @@ static int breathingDirection = -1;
 void animatedBreathing(led_t *currentKeyLedColors) {
   setAllKeysColorHSV(currentKeyLedColors, 85, 255, breathingValue);
   if (breathingValue >= 180) {
-    breathingDirection = -3;
+    breathingDirection = -2;
   } else if (breathingValue <= 2) {
-    breathingDirection = 3;
+    breathingDirection = 2;
   }
   breathingValue += breathingDirection;
 }
