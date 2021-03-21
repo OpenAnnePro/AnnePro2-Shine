@@ -54,8 +54,6 @@ ioline_t ledRows[NUM_ROW * 4] = {
     LINE_LED_ROW_5_R, LINE_LED_ROW_5_G, LINE_LED_ROW_5_B, 0,
 };
 
-#define REFRESH_FREQUENCY 200
-
 #define KEY_COUNT 70
 
 #define LEN(a) (sizeof(a) / sizeof(*a))
@@ -64,13 +62,12 @@ ioline_t ledRows[NUM_ROW * 4] = {
  * Active profiles
  * Add profiles from source/profiles.h in the profile array
  */
-typedef void (*lighting_callback)(led_t *, uint8_t);
+typedef void (*lighting_callback)(led_t *);
 
 /*
  * keypress handler
  */
-typedef void (*keypress_handler)(led_t *colors, uint8_t row, uint8_t col,
-                                 uint8_t intensity);
+typedef void (*keypress_handler)(led_t *colors, uint8_t row, uint8_t col);
 
 typedef void (*profile_init)(led_t *colors);
 
@@ -252,7 +249,7 @@ void changeMask(uint8_t mask) {
 }
 
 void nextIntensity() {
-  ledIntensity = (ledIntensity + 1) % 4;
+  ledIntensity = (ledIntensity + 1) % 8;
   executeProfile(false);
 }
 
@@ -273,7 +270,7 @@ inline void handleKeypress(msg_t msg) {
   uint8_t col = msg & 0b1111;
   keypress_handler handler = profiles[currentProfile].keypressCallback;
   if (handler != NULL && row < NUM_ROW && col < NUM_COLUMN) {
-    handler(ledColors, row, col, ledIntensity);
+    handler(ledColors, row, col);
   }
 }
 
@@ -290,7 +287,7 @@ void setForegroundColor() {
     foregroundColor = *(uint32_t *)&colorBytes;
     foregroundColorSet = true;
 
-    setAllKeysColor(ledColors, foregroundColor, ledIntensity);
+    setAllKeysColor(ledColors, foregroundColor);
   }
 }
 
@@ -408,8 +405,7 @@ void ledSet() {
   if (bytesRead >= 4) {
     if (commandBuffer[0] < NUM_ROW && commandBuffer[1] < NUM_COLUMN) {
       setKeyColor(&ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]],
-                  ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]),
-                  ledIntensity);
+                  ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]));
     }
   }
 }
@@ -423,6 +419,7 @@ void ledSetRow() {
       sdReadTimeout(&SD1, commandBuffer, sizeof(led_t) * NUM_COLUMN + 1, 1000);
   if (bytesRead >= sizeof(led_t) * NUM_COLUMN + 1) {
     if (commandBuffer[0] < NUM_ROW) {
+      /* FIXME: Don't use direct access */
       memcpy(&ledColors[commandBuffer[0] * NUM_COLUMN], &commandBuffer[1],
              sizeof(led_t) * NUM_COLUMN);
     }
@@ -435,14 +432,12 @@ inline uint8_t min(uint8_t a, uint8_t b) { return a <= b ? a : b; }
  * Update lighting table as per animation
  */
 static inline void animationCallback() {
-
   // If the foreground is set we skip the animation as a way to avoid it
   // overrides the foreground
   if (foregroundColorSet) {
     return;
   }
-
-  profiles[currentProfile].callback(ledColors, ledIntensity);
+  profiles[currentProfile].callback(ledColors);
 }
 
 static inline void sPWM(uint8_t cycle, uint8_t currentCount, ioline_t port) {
@@ -470,7 +465,7 @@ void mainCallback(GPTDriver *_driver) {
 
     if (needToCallbackProfile) {
       needToCallbackProfile = false;
-      profiles[currentProfile].callback(ledColors, ledIntensity);
+      profiles[currentProfile].callback(ledColors);
     } else {
       bool animationCalled = false;
       if (animationSkipTicks > 0) {
@@ -501,13 +496,13 @@ void mainCallback(GPTDriver *_driver) {
             uint8_t delta = 0;
 
             if (row % 4 == 0) {
-              cl = keyLED.red;
+              cl = keyLED.p.red;
               delta = 0;
             } else if (row % 4 == 1) {
-              cl = keyLED.green;
+              cl = keyLED.p.green;
               delta = 85;
             } else {
-              cl = keyLED.blue;
+              cl = keyLED.p.blue;
               delta = 170;
             }
             sPWM(cl, rowPWMCount + delta, ledRows[row]);
@@ -534,7 +529,6 @@ int main(void) {
   halInit();
   chSysInit();
 
-  /* profiles[currentProfile].callback(ledColors, ledIntensity); */
   updateAnimationSpeed();
 
   // Setup masks to all be 0xFF at the start
