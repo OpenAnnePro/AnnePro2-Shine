@@ -26,6 +26,19 @@ The resulting `.bin` files will be in the `build` directory
 named `annepro2-shine-C15.bin` and `annepro2-shine-C18.bin`
 respectively
 
+
+# Debugging
+
+You can debug the chip using jlink debugger or, in a limited way using a Black
+Magic Probe (BMP) debugger - which can be flashed onto a cheap and available STM
+evaluation boards.
+
+LED chip is to the left from the spacebar switch and has 5 pads to solder the
+SWD port, from the left: Unused?, reset, ground, clk, io.
+
+BMP can stop the program and investigate the current variables, but can't set
+breakpoints or step.
+
 # Contribute
 
 Thanks to @Stanley00 on the Anne Pro Dev discord for implementing

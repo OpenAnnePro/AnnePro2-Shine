@@ -23,12 +23,12 @@
 #ifdef C18
 #define ANNEPRO2_C18
 #define BOARD_NAME "Anne Pro 2 C18"
+#define HT32F52352
 #else
 #define ANNEPRO2_C15
 #define BOARD_NAME "Anne Pro 2 C15"
-#endif
-
 #define HT32F52342
+#endif
 
 #define FLASH_SIZE 0x10000 - 0x4000 // 64kB - 16kB
 
