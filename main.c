@@ -470,6 +470,7 @@ static inline void animationCallback() {
  * Row1 R-G-B, Row2 R-G-B, Row3 R-G-B, ...
  */
 uint8_t rowTimes[NUM_ROW * 3];
+uint8_t rowsEnabled;
 
 /*
  * pwmCounter which counts time of lit rows within each column cycle.
@@ -491,7 +492,12 @@ static inline void pwmRowDimmer() {
     const uint8_t time = rowTimes[ledRow];
     if (pwmCounter == time) {
       palClearLine(ledRows[ledRow]);
+      rowsEnabled--;
     }
+  }
+  if (rowsEnabled == 0) {
+    /* Limit color bleed by disabling the column as early as possible */
+    palClearLine(ledColumns[currentColumn]);
   }
 }
 
@@ -507,6 +513,7 @@ static inline void pwmNextColumn() {
   const uint8_t intensityDecrease = ledIntensity * 8;
 
   /* Prepare the PWM data and enable leds for non-zero colors */
+  rowsEnabled = 0;
   for (size_t keyRow = 0; keyRow < NUM_ROW; keyRow++) {
     const uint8_t ledIndex = currentColumn + NUM_COLUMN * keyRow;
     const led_t cl = ledColors[ledIndex];
@@ -521,13 +528,17 @@ static inline void pwmNextColumn() {
         color -= intensityDecrease;
         /* Each led is enabled for color>0 even for a short while. */
         palSetLine(ledRows[ledRow]);
+        rowsEnabled++;
       }
       rowTimes[ledRow] = color;
     }
   }
 
-  /* Enable the current LED column */
-  palSetLine(ledColumns[currentColumn]);
+  /* Enable the current LED column if at least one row needs this. Limit bleed
+     and maybe power consumption on reactive profiles. */
+  if (rowsEnabled) {
+    palSetLine(ledColumns[currentColumn]);
+  }
 }
 
 // mainCallback is responsible for 2 things:
