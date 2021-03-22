@@ -13,12 +13,15 @@ typedef union {
     /* Little endian ordering to match uint32_t */
     uint8_t blue, green, red;
     uint8_t align;
-  } p;
-  /* Index access: 0 - blue, 1 - green, 2 - red */
+  } p; /* parts */
+  /* Parts vector access: 0 - blue, 1 - green, 2 - red */
   uint8_t pv[4];
   /* 0xrgb in mem is b g r X */
   uint32_t rgb;
 } led_t;
+
+// Calculate position within the ledColors array
+#define ROWCOL2IDX(row, col) (NUM_COLUMN * (row) + (col))
 
 /*
     Function Signatures

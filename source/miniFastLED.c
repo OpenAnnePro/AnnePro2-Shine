@@ -106,7 +106,6 @@ void setAllKeysColorHSV(led_t *ledColors, uint8_t hue, uint8_t sat,
   // Convert hsv to rgb
   hsv2rgb(hue, sat, val, &rgbArray);
 
-  /* TODO Use memset */
   // Set key colors
   for (uint16_t i = 0; i < NUM_COLUMN * NUM_ROW; ++i) {
     ledColors[i] = rgbArray;
@@ -134,7 +133,6 @@ void setRowColorHSV(led_t *ledColors, uint8_t row, uint8_t hue, uint8_t sat,
   hsv2rgb(hue, sat, val, &rgbArray);
 
   // Set column key color
-  /* TODO Use memset? */
   for (uint16_t i = 0; i < NUM_COLUMN; ++i) {
     // section 1: 0x40..0x7F
     ledColors[row * NUM_COLUMN + i] = rgbArray;

@@ -59,7 +59,7 @@ void colorBleed(led_t *currentKeyLedColors) {
 
 void white(led_t *currentKeyLedColors) {
   /* To get "white" you need to compensate for red/blue switches on board */
-  setAllKeysColor(currentKeyLedColors, 0xAAFFFF);
+  setAllKeysColor(currentKeyLedColors, 0x80ff99);
 }
 
 void miamiNights(led_t *currentKeyLedColors) {

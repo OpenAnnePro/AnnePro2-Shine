@@ -106,17 +106,14 @@ profile profiles[] = {
     {blue, {0, 0, 0, 0}, NULL, NULL},
     {rainbowHorizontal, {0, 0, 0, 0}, NULL, NULL},
     {rainbowVertical, {0, 0, 0, 0}, NULL, NULL},
-    {animatedRainbowVertical, {500, 400, 300, 200}, NULL, NULL},
-    {animatedRainbowFlow, {100, 65, 30, 15}, NULL, NULL},
-    {animatedRainbowWaterfall, {100, 65, 30, 15}, NULL, NULL},
-    {animatedBreathing, {35, 20, 10}, NULL, NULL},
-    {animatedWave, {32, 28, 24, 22}, NULL, NULL},
-    {animatedSpectrum, {150, 90, 60, 25}, NULL, NULL},
-    {reactiveFade, {50, 35, 30, 10}, reactiveFadeKeypress, reactiveFadeInit},
-    {reactivePulse,
-     {50, 35, 30, 10},
-     reactivePulseKeypress,
-     reactivePulseInit}};
+    {animatedRainbowVertical, {35, 28, 21, 14}, NULL, NULL},
+    {animatedRainbowFlow, {7, 5, 2, 1}, NULL, NULL},
+    {animatedRainbowWaterfall, {7, 5, 2, 1}, NULL, NULL},
+    {animatedBreathing, {5, 3, 2, 1}, NULL, NULL},
+    {animatedWave, {5, 3, 2, 1}, NULL, NULL},
+    {animatedSpectrum, {11, 6, 4, 1}, NULL, NULL},
+    {reactiveFade, {4, 3, 2, 1}, reactiveFadeKeypress, reactiveFadeInit},
+    {reactivePulse, {4, 3, 2, 1}, reactivePulseKeypress, reactivePulseInit}};
 
 static uint8_t currentProfile = 0;
 static const uint8_t amountOfProfiles = sizeof(profiles) / sizeof(profile);
@@ -142,6 +139,8 @@ static uint16_t animationTicks = 0;
 
    80kHz with pwmCounterLimit=80 will scan 14 columns at 71.4Hz - enough for
    smooth animations, and allows for 6bit LED brightness control.
+
+   Tests on oscilloscope suggest it can reach 100kHz.
  */
 static const GPTConfig bftm0Config = {.frequency = 80000,
                                       .callback = mainCallback};
@@ -429,7 +428,7 @@ void ledSet() {
 
   if (bytesRead >= 4) {
     if (commandBuffer[0] < NUM_ROW && commandBuffer[1] < NUM_COLUMN) {
-      setKeyColor(&ledColors[commandBuffer[0] * NUM_COLUMN + commandBuffer[1]],
+      setKeyColor(&ledColors[ROWCOL2IDX(commandBuffer[0], commandBuffer[1])],
                   ((uint16_t)commandBuffer[3] << 8 | commandBuffer[2]));
     }
   }
@@ -445,7 +444,7 @@ void ledSetRow() {
   if (bytesRead >= sizeof(led_t) * NUM_COLUMN + 1) {
     if (commandBuffer[0] < NUM_ROW) {
       /* FIXME: Don't use direct access */
-      memcpy(&ledColors[commandBuffer[0] * NUM_COLUMN], &commandBuffer[1],
+      memcpy(&ledColors[ROWCOL2IDX(commandBuffer[0], 0)], &commandBuffer[1],
              sizeof(led_t) * NUM_COLUMN);
     }
   }
@@ -515,7 +514,7 @@ static inline void pwmNextColumn() {
   /* Prepare the PWM data and enable leds for non-zero colors */
   rowsEnabled = 0;
   for (size_t keyRow = 0; keyRow < NUM_ROW; keyRow++) {
-    const uint8_t ledIndex = currentColumn + NUM_COLUMN * keyRow;
+    const uint8_t ledIndex = ROWCOL2IDX(keyRow, currentColumn);
     const led_t cl = ledColors[ledIndex];
 
     for (size_t colorIdx = 0; colorIdx < 3; colorIdx++) {
@@ -567,7 +566,7 @@ void mainCallback(GPTDriver *_driver) {
    * pwmCounterLimit=80 + 80kHz timer this refreshes at 80kHz/80/14 = 71Hz and
    * should be a sensible maximum speed for a fluent smooth animation.
    */
-  if (animationSkipTicks > 0) {
+  if (animationSkipTicks > 0 && currentColumn == 13) {
     animationTicks++;
     if (animationTicks >= animationSkipTicks) {
       animationTicks = 0;
