@@ -40,6 +40,7 @@
 
 #define NUM_COLUMN                                         14
 #define NUM_ROW                                            5
+#define KEY_COUNT                                          70
 
 #ifdef C18
 #define LINE_LED_PWR                                       PAL_LINE(IOPORTA, 10)

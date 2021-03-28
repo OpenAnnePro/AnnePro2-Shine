@@ -191,7 +191,7 @@ void reactiveFadeInit(led_t *ledColors) {
       animatedPressedBuf[i * NUM_COLUMN + j] = i * 15 + 25;
     }
   }
-  memset(ledColors, 0, NUM_ROW * NUM_COLUMN * 3);
+  memset(ledColors, 0, NUM_ROW * NUM_COLUMN * sizeof(*ledColors));
 }
 
 uint8_t pulseBuf[NUM_ROW];

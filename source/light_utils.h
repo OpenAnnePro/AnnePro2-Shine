@@ -4,9 +4,6 @@
 #include "board.h"
 #include "hal.h"
 
-/*
-    Structs
-*/
 // Struct defining an LED and its RGB color components
 typedef union {
   struct {
@@ -19,9 +16,6 @@ typedef union {
   /* 0xrgb in mem is b g r X */
   uint32_t rgb;
 } led_t;
-
-// Calculate position within the ledColors array
-#define ROWCOL2IDX(row, col) (NUM_COLUMN * (row) + (col))
 
 /*
     Function Signatures
