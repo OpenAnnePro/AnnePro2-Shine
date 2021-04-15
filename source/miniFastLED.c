@@ -7,28 +7,26 @@
 /*
     #define HSV specifics
 */
-#define APPLY_DIMMING(X, Y) ((X) >> (Y))
 #define HSV_SECTION_6 (0x20)
 #define HSV_SECTION_3 (0x40)
 
 // Shared array used to place in the results of hsv2rgb
-uint8_t rgbArray[3];
+led_t rgbArray;
 
 // Convert HSV to RGB and write results to rgbResults
-void hsv2rgb(uint8_t hue, uint8_t sat, uint8_t val, uint8_t *rgbResults,
-             uint8_t intensity) {
+void hsv2rgb(uint8_t hue, uint8_t sat, uint8_t val, led_t *rgbResults) {
 
   // Convert hue, saturation and brightness ( HSV/HSB ) to RGB
   // "Dimming" is used on saturation and brightness to make
   // the output more visually linear.
 
   // Apply dimming curves
-  uint8_t value = APPLY_DIMMING(val, intensity);
+  uint8_t value = val;
   uint8_t saturation = sat;
 
   // The brightness floor is minimum number that all of
   // R, G, and B will be set to.
-  uint8_t invsat = APPLY_DIMMING(255 - saturation, intensity);
+  uint8_t invsat = 255 - saturation;
   uint8_t brightness_floor = (value * invsat) / 256;
 
   // The color amplitude is the maximum amount of R, G, and B
@@ -84,66 +82,59 @@ void hsv2rgb(uint8_t hue, uint8_t sat, uint8_t val, uint8_t *rgbResults,
   if (section) {
     if (section == 1) {
       // section 1: 0x40..0x7F
-      rgbResults[0] = brightness_floor;
-      rgbResults[1] = rampdown_adj_with_floor;
-      rgbResults[2] = rampup_adj_with_floor;
+      rgbResults->p.red = brightness_floor;
+      rgbResults->p.green = rampdown_adj_with_floor;
+      rgbResults->p.blue = rampup_adj_with_floor;
     } else {
       // section 2; 0x80..0xBF
-      rgbResults[0] = rampup_adj_with_floor;
-      rgbResults[1] = brightness_floor;
-      rgbResults[2] = rampdown_adj_with_floor;
+      rgbResults->p.red = rampup_adj_with_floor;
+      rgbResults->p.green = brightness_floor;
+      rgbResults->p.blue = rampdown_adj_with_floor;
     }
   } else {
     // section 0: 0x00..0x3F
-    rgbResults[0] = rampdown_adj_with_floor;
-    rgbResults[1] = rampup_adj_with_floor;
-    rgbResults[2] = brightness_floor;
+    rgbResults->p.red = rampdown_adj_with_floor;
+    rgbResults->p.green = rampup_adj_with_floor;
+    rgbResults->p.blue = brightness_floor;
   }
 }
 
 // Set all keys to HSV color
-void setAllKeysColorHSV(led_t *ledColors, uint8_t hue, uint8_t sat, uint8_t val,
-                        uint8_t intensity) {
+void setAllKeysColorHSV(led_t *ledColors, uint8_t hue, uint8_t sat,
+                        uint8_t val) {
 
   // Convert hsv to rgb
-  hsv2rgb(hue, sat, val, rgbArray, intensity);
+  hsv2rgb(hue, sat, val, &rgbArray);
 
   // Set key colors
   for (uint16_t i = 0; i < NUM_COLUMN * NUM_ROW; ++i) {
-    ledColors[i].red = rgbArray[0];
-    ledColors[i].green = rgbArray[1];
-    ledColors[i].blue = rgbArray[2];
+    ledColors[i] = rgbArray;
   }
 }
 
 // Set all keys to HSV color
 void setColumnColorHSV(led_t *ledColors, uint8_t column, uint8_t hue,
-                       uint8_t sat, uint8_t val, uint8_t intensity) {
+                       uint8_t sat, uint8_t val) {
 
   // Convert hsv to rgb
-  hsv2rgb(hue, sat, val, rgbArray, intensity);
+  hsv2rgb(hue, sat, val, &rgbArray);
 
   // Set column key color
   for (uint16_t i = 0; i < NUM_ROW; ++i) {
-    // section 1: 0x40..0x7F
-    ledColors[i * NUM_COLUMN + column].red = rgbArray[0];
-    ledColors[i * NUM_COLUMN + column].green = rgbArray[1];
-    ledColors[i * NUM_COLUMN + column].blue = rgbArray[2];
+    ledColors[i * NUM_COLUMN + column] = rgbArray;
   }
 }
 
 // Set column to HSV color
 void setRowColorHSV(led_t *ledColors, uint8_t row, uint8_t hue, uint8_t sat,
-                    uint8_t val, uint8_t intensity) {
+                    uint8_t val) {
 
   // Convert hsv to rgb
-  hsv2rgb(hue, sat, val, rgbArray, intensity);
+  hsv2rgb(hue, sat, val, &rgbArray);
 
   // Set column key color
   for (uint16_t i = 0; i < NUM_COLUMN; ++i) {
     // section 1: 0x40..0x7F
-    ledColors[row * NUM_COLUMN + i].red = rgbArray[0];
-    ledColors[row * NUM_COLUMN + i].green = rgbArray[1];
-    ledColors[row * NUM_COLUMN + i].blue = rgbArray[2];
+    ledColors[row * NUM_COLUMN + i] = rgbArray;
   }
 }
