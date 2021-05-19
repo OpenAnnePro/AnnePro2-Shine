@@ -20,7 +20,8 @@ profile profiles[] = {
     {animatedWave, {5, 3, 2, 1}, NULL, NULL},
     {animatedSpectrum, {11, 6, 4, 1}, NULL, NULL},
     {reactiveFade, {4, 3, 2, 1}, reactiveFadeKeypress, reactiveFadeInit},
-    {reactivePulse, {4, 3, 2, 1}, reactivePulseKeypress, reactivePulseInit}};
+    {reactivePulse, {4, 3, 2, 1}, reactivePulseKeypress, reactivePulseInit},
+    {reactiveTerm, {1, 2, 3, 4}, reactiveTermKeypress, reactiveTermInit}};
 
 /* Set your defaults here */
 uint8_t currentProfile = 0;

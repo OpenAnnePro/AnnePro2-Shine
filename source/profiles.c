@@ -1,4 +1,5 @@
 #include "profiles.h"
+#include "matrix.h"
 #include "miniFastLED.h"
 #include "string.h"
 
@@ -232,4 +233,85 @@ void reactivePulseInit(led_t *ledColors) {
     pulseBuf[i] = 80 + i * 5;
   }
   memset(ledColors, 0, NUM_ROW * NUM_COLUMN * 3);
+}
+
+/*
+ * Typewriter profile
+ */
+
+/* Helper function which sets color with range validation */
+void lazyMark(led_t *ledColors, int8_t row, int8_t col, const led_t color) {
+  if (row >= NUM_ROW || col >= NUM_COLUMN)
+    return;
+  if (row < 0 || col < 0)
+    return;
+  ledColors[ROWCOL2IDX(row, col)] = color;
+}
+
+int8_t rowBlink = -1;
+int8_t termPos;
+uint16_t termAnim;
+
+void reactiveTerm(led_t *ledColors) {
+  led_t color;
+  color.rgb = 0;
+  memset(ledColors, 0, NUM_COLUMN * NUM_ROW * sizeof(*ledColors));
+
+  if (termPos < 0) {
+    color.p.red = 255;
+    lazyMark(ledColors, 0, -termPos, color);
+    lazyMark(ledColors, 0, -termPos + 1, color);
+    termPos += 2;
+    return;
+  }
+
+  if (rowBlink != -1) {
+    color.p.red = 0;
+    color.p.green = 255;
+    for (int col = 0; col < NUM_COLUMN; col++) {
+      lazyMark(ledColors, rowBlink, col, color);
+    }
+
+    rowBlink = -1;
+  }
+
+  /* 70*14 times per second */
+  termAnim++;
+  if (termAnim > 140)
+    termAnim = 0;
+  int16_t brightness = 0;
+
+  if (termAnim < 70) {
+    brightness = termAnim * 51; /* full in 5 frames */
+    if (brightness > 255)
+      brightness = 255;
+  } else {
+    /* Starts with 70 */
+    brightness = 255 - (termAnim - 70) * 51;
+    if (brightness < 0)
+      brightness = 0;
+  }
+  color.p.green = 0;
+  color.p.red = brightness;
+  lazyMark(ledColors, 0, termPos, color);
+}
+
+void reactiveTermKeypress(led_t *ledColors, uint8_t row, uint8_t col) {
+  (void)row;
+  (void)col;
+  if (termPos >= 0) {
+    termPos = (termPos + 1);
+    if (termPos == 13) {
+      termPos = -14;
+    }
+  }
+  termAnim = 0;
+  rowBlink = row;
+  memset(ledColors, 0, NUM_COLUMN * NUM_ROW * sizeof(*ledColors));
+}
+
+void reactiveTermInit(led_t *ledColors) {
+  termPos = 0;
+  termAnim = 0;
+  memset(ledColors, 0, NUM_COLUMN * NUM_ROW * sizeof(*ledColors));
 }
