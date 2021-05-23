@@ -3,6 +3,7 @@
     This file contains functions adapted from the FastLED project (MIT License)
 */
 #include "miniFastLED.h"
+#include "settings.h"
 
 /*
     #define HSV specifics

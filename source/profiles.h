@@ -32,3 +32,7 @@ void reactiveFadeInit(led_t *ledColors);
 void reactivePulse(led_t *ledColors);
 void reactivePulseKeypress(led_t *ledColors, uint8_t row, uint8_t col);
 void reactivePulseInit(led_t *ledColors);
+
+void reactiveTerm(led_t *ledColors);
+void reactiveTermKeypress(led_t *ledColors, uint8_t row, uint8_t col);
+void reactiveTermInit(led_t *ledColors);
