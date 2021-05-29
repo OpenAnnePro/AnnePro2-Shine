@@ -12,15 +12,15 @@ static const uint32_t colorPalette[] = {0xcc0000, 0xcccc00, 0x5fcc00, 0x00c7cc,
 #define LEN(a) (sizeof(a) / sizeof(*a))
 
 void red(led_t *currentKeyLedColors) {
-  setAllKeysColor(currentKeyLedColors, 0xFF0000);
+  setAllKeysColor(currentKeyLedColors, naiveDimRGB(0xFF0000));
 }
 
 void green(led_t *currentKeyLedColors) {
-  setAllKeysColor(currentKeyLedColors, 0x00FF00);
+  setAllKeysColor(currentKeyLedColors, naiveDimRGB(0x00FF00));
 }
 
 void blue(led_t *currentKeyLedColors) {
-  setAllKeysColor(currentKeyLedColors, 0x0000FF);
+  setAllKeysColor(currentKeyLedColors, naiveDimRGB(0x0000FF));
 }
 
 /* Color bleed test pattern */
@@ -59,19 +59,28 @@ void colorBleed(led_t *currentKeyLedColors) {
 }
 
 void white(led_t *currentKeyLedColors) {
-  /* To get "white" you need to compensate for red/blue switches on board */
-  setAllKeysColor(currentKeyLedColors, 0x80ff99);
+  /* To get "white" you need to compensate for red/blue switches on board.
+
+     This code also uses HSV instead of RGB to get the dimming of the white
+     color a bit better. Naive dimming (decreasing all components equally)
+     causes the mixed, unpure RGB colors to change hue.
+   */
+
+  // setAllKeysColor(currentKeyLedColors, 0x80ff99);
+  /* 80ff99 -> H63 S125 V255 */
+  setAllKeysColorHSV(currentKeyLedColors, 63, 125, 255);
 }
 
 void miamiNights(led_t *currentKeyLedColors) {
-  setAllKeysColor(currentKeyLedColors, 0x00979c);
-  setModKeysColor(currentKeyLedColors, 0x9c008f);
+  setAllKeysColor(currentKeyLedColors, naiveDimRGB(0x00979c));
+  setModKeysColor(currentKeyLedColors, naiveDimRGB(0x9c008f));
 }
 
 void rainbowHorizontal(led_t *currentKeyLedColors) {
   for (uint16_t i = 0; i < NUM_ROW; ++i) {
     for (uint16_t j = 0; j < NUM_COLUMN; ++j) {
-      setKeyColor(&currentKeyLedColors[i * NUM_COLUMN + j], colorPalette[i]);
+      setKeyColor(&currentKeyLedColors[i * NUM_COLUMN + j],
+                  naiveDimRGB(colorPalette[i]));
     }
   }
 }
@@ -80,7 +89,7 @@ void rainbowVertical(led_t *currentKeyLedColors) {
   for (uint16_t i = 0; i < NUM_COLUMN; ++i) {
     for (uint16_t j = 0; j < NUM_ROW; ++j) {
       setKeyColor(&currentKeyLedColors[j * NUM_COLUMN + i],
-                  colorPalette[i % LEN(colorPalette)]);
+                  naiveDimRGB(colorPalette[i % LEN(colorPalette)]));
     }
   }
 }
@@ -89,8 +98,9 @@ static uint8_t colAnimOffset = 0;
 void animatedRainbowVertical(led_t *currentKeyLedColors) {
   for (uint16_t i = 0; i < NUM_COLUMN; ++i) {
     for (uint16_t j = 0; j < NUM_ROW; ++j) {
-      setKeyColor(&currentKeyLedColors[j * NUM_COLUMN + i],
-                  colorPalette[(i + colAnimOffset) % LEN(colorPalette)]);
+      setKeyColor(
+          &currentKeyLedColors[j * NUM_COLUMN + i],
+          naiveDimRGB(colorPalette[(i + colAnimOffset) % LEN(colorPalette)]));
     }
   }
   colAnimOffset = (colAnimOffset + 1) % LEN(colorPalette);
@@ -259,6 +269,7 @@ void reactiveTerm(led_t *ledColors) {
 
   if (termPos < 0) {
     color.p.red = 255;
+    naiveDimLed(&color);
     lazyMark(ledColors, 0, -termPos, color);
     lazyMark(ledColors, 0, -termPos + 1, color);
     termPos += 2;
@@ -268,6 +279,7 @@ void reactiveTerm(led_t *ledColors) {
   if (rowBlink != -1) {
     color.p.red = 0;
     color.p.green = 255;
+    naiveDimLed(&color);
     for (int col = 0; col < NUM_COLUMN; col++) {
       lazyMark(ledColors, rowBlink, col, color);
     }
@@ -293,6 +305,7 @@ void reactiveTerm(led_t *ledColors) {
   }
   color.p.green = 0;
   color.p.red = brightness;
+  naiveDimLed(&color);
   lazyMark(ledColors, 0, termPos, color);
 }
 

@@ -38,7 +38,7 @@ extern uint8_t currentProfile;
 extern const uint8_t amountOfProfiles;
 extern volatile uint8_t currentSpeed;
 
-/* Default zero corresponds to full intensity. */
+/* 0 - 7: Zero corresponds to the full intensity. */
 extern uint8_t ledIntensity;
 
 #endif

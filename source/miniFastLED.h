@@ -34,6 +34,45 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "board.h"
 #include "hal.h"
 #include "light_utils.h"
+#include "settings.h"
+
+/*
+    HSV Constants
+*/
+#define HUE_RED 0
+#define HUE_YELLOW 32
+#define HUE_GREEN 64
+#define HUE_CYAN 96
+#define HUE_BLUE 128
+#define HUE_MAGENTA 160
+
+/*
+    Helpers for dimming. There're used by hsv2rgb internally, but you can use
+    them if you're using direct RGB colors and want to dim them naively.
+ */
+
+/* Dim a single value: R, G, B or a saturation component of the HSV color */
+static inline int8_t dimValue(uint8_t value) {
+  const uint8_t dimBy = ledIntensity * 30;
+  if (dimBy > value)
+    return 0;
+  return value - dimBy;
+}
+
+/* Naively dim all values within the led_t variable */
+static inline void naiveDimLed(led_t *color) {
+  color->p.blue = dimValue(color->p.blue);
+  color->p.red = dimValue(color->p.red);
+  color->p.green = dimValue(color->p.green);
+}
+
+/* Returns a naively "dimmed" RGB color */
+static inline uint32_t naiveDimRGB(uint32_t color) {
+  led_t c;
+  c.rgb = color;
+  naiveDimLed(&c);
+  return c.rgb;
+}
 
 /*
     Function Signatures
