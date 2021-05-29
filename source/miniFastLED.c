@@ -3,7 +3,6 @@
     This file contains functions adapted from the FastLED project (MIT License)
 */
 #include "miniFastLED.h"
-#include "settings.h"
 
 /*
     #define HSV specifics
@@ -15,33 +14,33 @@
 led_t rgbArray;
 
 // Convert HSV to RGB and write results to rgbResults
+// Applies current dimming settings.
 void hsv2rgb(uint8_t hue, uint8_t sat, uint8_t val, led_t *rgbResults) {
 
-  // Convert hue, saturation and brightness ( HSV/HSB ) to RGB
-  // "Dimming" is used on saturation and brightness to make
-  // the output more visually linear.
+  // Convert hue, saturation and brightness ( HSV/HSB ) to RGB while applying
+  // dimming to the HSV "Value".
 
   // Apply dimming curves
-  uint8_t value = val;
-  uint8_t saturation = sat;
+  const uint8_t value = dimValue(val);
+  const uint8_t saturation = sat;
 
   // The brightness floor is minimum number that all of
   // R, G, and B will be set to.
-  uint8_t invsat = 255 - saturation;
-  uint8_t brightness_floor = (value * invsat) / 256;
+  const uint8_t invsat = 255 - saturation;
+  const uint8_t brightness_floor = (value * invsat) / 256;
 
   // The color amplitude is the maximum amount of R, G, and B
   // that will be added on top of the brightness_floor to
   // create the specific hue desired.
-  uint8_t color_amplitude = value - brightness_floor;
+  const uint8_t color_amplitude = value - brightness_floor;
 
   // Figure out which section of the hue wheel we're in,
   // and how far offset we are withing that section
-  uint8_t section = hue / HSV_SECTION_3; // 0..2
-  uint8_t offset = hue % HSV_SECTION_3;  // 0..63
+  const uint8_t section = hue / HSV_SECTION_3; // 0..2
+  const uint8_t offset = hue % HSV_SECTION_3;  // 0..63
 
-  uint8_t rampup = offset;                         // 0..63
-  uint8_t rampdown = (HSV_SECTION_3 - 1) - offset; // 63..0
+  const uint8_t rampup = offset;                         // 0..63
+  const uint8_t rampdown = (HSV_SECTION_3 - 1) - offset; // 63..0
 
   // We now scale rampup and rampdown to a 0-255 range -- at least
   // in theory, but here's where architecture-specific decsions
