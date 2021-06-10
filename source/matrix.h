@@ -19,6 +19,9 @@ extern bool needToCallbackProfile;
 /* If non-zero the animation is enabled; 1 is full speed */
 extern volatile uint16_t animationSkipTicks;
 
+/* Is matrix enabled? */
+extern bool matrixEnabled;
+
 /* Animation tick counter used to slow down animations */
 extern uint16_t animationTicks;
 
@@ -26,8 +29,6 @@ extern uint16_t animationTicks;
 // Flag to check if there is a foreground color currently active
 extern bool foregroundColorSet;
 extern uint32_t foregroundColor;
-
-extern uint8_t ledMasks[KEY_COUNT];
 
 void matrixInit(void);
 void matrixEnable(void);

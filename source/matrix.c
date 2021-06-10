@@ -8,6 +8,7 @@
 /* LED Matrix state */
 led_t ledColors[KEY_COUNT];
 bool needToCallbackProfile = false;
+bool matrixEnabled;
 
 /* Animations */
 /* If non-zero the animation is enabled; 1 is full speed */
@@ -20,8 +21,6 @@ uint16_t animationTicks = 0;
 // Flag to check if there is a foreground color currently active
 bool foregroundColorSet = false;
 uint32_t foregroundColor = 0;
-
-uint8_t ledMasks[KEY_COUNT];
 
 /* Internal function prototypes */
 static void animationCallback(void);
@@ -218,6 +217,7 @@ void matrixDisable() {
   for (int i = 0; i < NUM_COLUMN; i++) {
     palClearLine(ledColumns[i]);
   }
+  matrixEnabled = false;
   chMtxUnlock(&mtx);
 }
 
@@ -233,8 +233,12 @@ void matrixEnable(void) {
   gptStart(&GPTD_BFTM0, &bftm0Config);
   gptStartContinuous(&GPTD_BFTM0, 1);
 
+  matrixEnabled = true;
   chMtxUnlock(&mtx);
 }
 
 /* Initialize matrix module */
-void matrixInit() { chMtxObjectInit(&mtx); }
+void matrixInit() {
+  chMtxObjectInit(&mtx);
+  matrixEnabled = false;
+}
