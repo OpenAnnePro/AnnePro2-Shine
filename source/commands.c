@@ -1,15 +1,10 @@
 #include "commands.h"
+#include "board.h"
 #include "matrix.h"
+#include "miniFastLED.h"
 #include "profiles.h"
 #include "protocol.h"
 #include <string.h>
-
-static void executeProfile(bool init);
-static void setProfile(message_t *msg);
-static void nextIntensity(void);
-static void nextSpeed(void);
-static void handleKeypress(uint8_t command);
-static void setIAP(void);
 
 /*
  * Reactive profiles are profiles which react to keypresses.
@@ -17,7 +12,7 @@ static void setIAP(void);
  * the current profile is reactive and coordinates of pressed
  * keys should be sent to LED controller.
  */
-void sendStatus(void) {
+static inline void sendStatus(void) {
   uint8_t isReactive = profiles[currentProfile].keypressCallback != NULL;
 
   uint8_t payload[] = {
@@ -27,8 +22,7 @@ void sendStatus(void) {
   protoTx(CMD_LED_STATUS, payload, sizeof(payload), 3);
 }
 
-void setIAP() {
-
+static inline void setIAP(void) {
   // Magic key to set keyboard to IAP
   *((uint32_t *)0x20001ffc) = 0x0000fab2;
 
@@ -36,14 +30,27 @@ void setIAP() {
   NVIC_SystemReset();
 }
 
-void nextIntensity() {
+/*
+ * Execute current profile
+ */
+static inline void executeProfile(bool init) {
+  profile_init pinit = profiles[currentProfile].profileInit;
+  if (init && pinit != NULL) {
+    pinit(ledColors);
+  }
+
+  updateAnimationSpeed();
+
+  needToCallbackProfile = true;
+}
+
+static inline void nextIntensity(void) {
   ledIntensity = (ledIntensity + 1) % 8;
   executeProfile(false);
 }
 
-void nextSpeed() {
+static inline void nextSpeed(void) {
   currentSpeed = (currentSpeed + 1) % 4;
-  foregroundColorSet = false;
   updateAnimationSpeed();
 }
 
@@ -53,7 +60,7 @@ void nextSpeed() {
  * Because this callback is called on every keypress,
  * the data is packed into a single byte to decrease the data traffic.
  */
-inline void handleKeypress(uint8_t command) {
+static inline void handleKeypress(uint8_t command) {
   uint8_t row = (command >> 4) & 0b111;
   uint8_t col = command & 0b1111;
   keypress_handler handler = profiles[currentProfile].keypressCallback;
@@ -96,80 +103,67 @@ void clearForegroundColor() {
 /*
  * Set profile and execute it
  */
-void setProfile(message_t *msg) {
-  uint8_t profile = msg->payload[0];
+static inline void setProfile(uint8_t profile) {
   if (profile < amountOfProfiles) {
-    foregroundColorSet = false;
     currentProfile = profile;
     executeProfile(true);
   }
 }
 
 /*
- * Execute current profile
+ * Handle masking
  */
-void executeProfile(bool init) {
-  // Here we disable the foreground to ensure the animation will run
-  foregroundColorSet = false;
 
-  profile_init pinit = profiles[currentProfile].profileInit;
-  if (init && pinit != NULL) {
-    pinit(ledColors);
-  }
-
-  updateAnimationSpeed();
-
-  needToCallbackProfile = true;
-}
-
-/*
- * Set a led based on qmk communication
- */
-/*
-void ledSet(message_t *msg) {
-  const uint8_t row = msg->payload[0];
-  const uint8_t col = msg->payload[1];
-  const led_t color = {
-      .p.red = msg->payload[2],
-      .p.green = msg->payload[3],
-      .p.blue = msg->payload[4],
-  };
-
-  if (row < NUM_ROW && col < NUM_COLUMN) {
-    setKeyColor(&ledColors[ROWCOL2IDX(row, col)], color.rgb);
-  }
-}
-*/
-
-/*
- * Set a row of leds based on qmk communication
- * TODO: Do it better with masks.
- */
-/*
-void ledSetRow(message_t *msg) {
-  // FIXME: Unify with the main chip or remove
+/* Override one key with a given color */
+static inline void setMaskKey(const message_t *msg) {
   uint8_t row = msg->payload[0];
-  if (row >= NUM_ROW)
+  uint8_t col = msg->payload[1];
+  led_t color = {.p.blue = msg->payload[2],
+                 .p.green = msg->payload[3],
+                 .p.red = msg->payload[4],
+                 .p.alpha = msg->payload[5]};
+  naiveDimLed(&color);
+  if (row < NUM_ROW && col <= NUM_COLUMN)
+    setKeyColor(&ledMask[ROWCOL2IDX(row, col)], color.rgb);
+}
+
+/* Override all keys with given color */
+static inline void setMaskRow(const message_t *msg) {
+  uint8_t row = msg->payload[0];
+  if (row > NUM_ROW)
     return;
 
-  led_t color;
+  const uint8_t *payloadPtr = &msg->payload[1];
 
-  for (int c = 0; c < NUM_COLUMN; c++) {
-    color.p.red = msg->payload[1 + c * 3 + 0];
-    color.p.green = msg->payload[1 + c * 3 + 1];
-    color.p.blue = msg->payload[1 + c * 3 + 2];
+  for (int col = 0; col < NUM_COLUMN; col++) {
+    led_t color;
+    color.p.blue = *(payloadPtr++);
+    color.p.green = *(payloadPtr++);
+    color.p.red = *(payloadPtr++);
+    color.p.alpha = *(payloadPtr++);
 
-    ledColors[ROWCOL2IDX(row, c)] = color;
+    naiveDimLed(&color);
+    ledMask[ROWCOL2IDX(row, col)] = color;
   }
 }
-*/
+
+/* Override all keys with given color */
+static inline void setMaskMono(const message_t *msg) {
+  led_t color = {.p.red = msg->payload[2],
+                 .p.green = msg->payload[1],
+                 .p.blue = msg->payload[0],
+                 .p.alpha = msg->payload[3]};
+
+  naiveDimLed(&color);
+  setAllKeysColor(ledMask, color.rgb);
+}
 
 /*
  * Execute action based on a message. This runs in a separate thread than LED
- * refreshing algorithm. Keep it simple, fast, mark something in a variable and
- * do the rest in another thread.
+ * refreshing algorithm. Keep it simple, fast, mark something in a variable
+ * and do the rest in another thread.
  */
-void commandCallback(message_t *msg) {
+void commandCallback(const message_t *msg) {
   switch (msg->command) {
   case CMD_LED_ON:
     executeProfile(true);
@@ -181,7 +175,7 @@ void commandCallback(message_t *msg) {
     sendStatus();
     break;
   case CMD_LED_SET_PROFILE:
-    setProfile(msg);
+    setProfile(msg->payload[0]);
     sendStatus();
     break;
   case CMD_LED_NEXT_PROFILE:
@@ -206,9 +200,22 @@ void commandCallback(message_t *msg) {
   case CMD_LED_IAP:
     setIAP();
     break;
+
   case CMD_LED_KEY_DOWN:
     handleKeypress(msg->payload[0]);
     break;
+
+  /* Handle masking */
+  case CMD_LED_MASK_SET_KEY:
+    setMaskKey(msg);
+    break;
+  case CMD_LED_MASK_SET_ROW:
+    setMaskRow(msg);
+    break;
+  case CMD_LED_MASK_SET_MONO:
+    setMaskMono(msg);
+    break;
+
   default:
     proto.errors++;
     break;

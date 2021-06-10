@@ -11,6 +11,9 @@
 /* Current matrix state */
 extern led_t ledColors[KEY_COUNT];
 
+/* Color override by main chip. */
+extern led_t ledMask[KEY_COUNT];
+
 /* In case we switched to a new profile, the mainCallback should call the
  * profile handler initially when this flag is set to true. */
 extern bool needToCallbackProfile;

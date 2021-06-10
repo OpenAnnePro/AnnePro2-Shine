@@ -3,6 +3,6 @@
 
 #include "protocol.h"
 
-extern void commandCallback(message_t *msg);
+extern void commandCallback(const message_t *msg);
 
 #endif
