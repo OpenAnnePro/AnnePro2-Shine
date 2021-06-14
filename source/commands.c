@@ -22,6 +22,10 @@ static inline void sendStatus(void) {
   protoTx(CMD_LED_STATUS, payload, sizeof(payload), 3);
 }
 
+void sendDebug(const char *payload, uint8_t size) {
+  protoTx(CMD_LED_DEBUG, (unsigned char *)payload, size, 1);
+}
+
 static inline void setIAP(void) {
   // Magic key to set keyboard to IAP
   *((uint32_t *)0x20001ffc) = 0x0000fab2;
@@ -68,37 +72,6 @@ static inline void handleKeypress(uint8_t command) {
     handler(ledColors, row, col);
   }
 }
-
-/*
- * Set all the leds to the specified color
- */
-#if 0
-void setForegroundColor(led_t color) {
-  foregroundColor = color.rgb;
-
-  foregroundColorSet = true;
-
-  setAllKeysColor(ledColors, color.rgb);
-}
-
-void clearForegroundColor() {
-  foregroundColorSet = false;
-
-  if (animationSkipTicks == 0) {
-    // If the current profile is static, we need to reset its colors
-    // to what it was before the background color was activated.
-    memset(ledColors, 0, sizeof(ledColors));
-    needToCallbackProfile = true;
-  } else if (profiles[currentProfile].keypressCallback != NULL) {
-    /* Check if current profile is reactive. If it is, clear the colors. Not
-     * doing it will keep the foreground color if it is a reactive profile This
-     * might cause a split blackout with reactive profiles in the future if they
-     * have also have static colors/animation.
-     */
-    memset(ledColors, 0, sizeof(ledColors));
-  }
-}
-#endif
 
 /*
  * Set profile and execute it
@@ -158,6 +131,61 @@ static inline void setMaskMono(const message_t *msg) {
   setAllKeysColor(ledMask, color.rgb);
 }
 
+/* Thread status */
+struct {
+  volatile uint8_t running;
+  uint8_t row;
+  uint8_t col;
+  led_t color;
+  uint8_t times;
+  uint32_t hundredths;
+  thread_t *thread;
+} blinker;
+
+/* Blinker thread - one active at a time. */
+static THD_FUNCTION(blinkerFun, arg) {
+  (void)arg;
+  uint8_t on = 1;
+
+  for (; blinker.times > 0 && blinker.running; blinker.times--) {
+    if (on)
+      setKeyColor(&ledMask[ROWCOL2IDX(blinker.row, blinker.col)],
+                  blinker.color.rgb);
+    else
+      setKeyColor(&ledMask[ROWCOL2IDX(blinker.row, blinker.col)], 0xff000000);
+    on ^= 0x01;
+
+    for (uint32_t i = 0; i < blinker.hundredths && blinker.running; i++) {
+      /* Doing this in chunks of 10ms allows for a faster quit */
+      chThdSleepMilliseconds(10);
+    }
+  }
+  setKeyColor(&ledMask[ROWCOL2IDX(blinker.row, blinker.col)], 0x00);
+}
+
+/* Prepare thread data and schedule a blinking thread */
+static inline void blinkKey(const message_t *msg) {
+  if (blinker.thread != NULL) {
+    blinker.running = 0;
+    chThdWait(blinker.thread);
+    blinker.thread = NULL;
+  }
+
+  blinker.row = msg->payload[0];
+  blinker.col = msg->payload[1];
+  blinker.color.p.blue = msg->payload[2];
+  blinker.color.p.green = msg->payload[3];
+  blinker.color.p.red = msg->payload[4];
+  blinker.color.p.alpha = msg->payload[5];
+
+  blinker.times = msg->payload[6];
+  blinker.hundredths = msg->payload[7];
+  blinker.running = 1;
+
+  blinker.thread = chThdCreateFromHeap(NULL, THD_WORKING_AREA_SIZE(128),
+                                       "blinker", NORMALPRIO, blinkerFun, NULL);
+}
+
 /*
  * Execute action based on a message. This runs in a separate thread than LED
  * refreshing algorithm. Keep it simple, fast, mark something in a variable
@@ -214,6 +242,9 @@ void commandCallback(const message_t *msg) {
     break;
   case CMD_LED_MASK_SET_MONO:
     setMaskMono(msg);
+    break;
+  case CMD_LED_KEY_BLINK:
+    blinkKey(msg);
     break;
 
   default:
