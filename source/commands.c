@@ -178,11 +178,11 @@ static inline void blinkKey(const message_t *msg) {
   blinker.color.p.red = msg->payload[4];
   blinker.color.p.alpha = msg->payload[5];
 
-  blinker.times = msg->payload[6];
+  blinker.times = msg->payload[6] * 2;
   blinker.hundredths = msg->payload[7];
   blinker.running = 1;
 
-  blinker.thread = chThdCreateFromHeap(NULL, THD_WORKING_AREA_SIZE(128),
+  blinker.thread = chThdCreateFromHeap(NULL, THD_WORKING_AREA_SIZE(32),
                                        "blinker", NORMALPRIO, blinkerFun, NULL);
 }
 
