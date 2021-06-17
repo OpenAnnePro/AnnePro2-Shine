@@ -9,7 +9,8 @@ typedef union {
   struct {
     /* Little endian ordering to match uint32_t */
     uint8_t blue, green, red;
-    uint8_t align;
+    /* Used in mask; nonzero means - use color from mask. */
+    uint8_t alpha;
   } p; /* parts */
   /* Parts vector access: 0 - blue, 1 - green, 2 - red */
   uint8_t pv[4];
@@ -17,9 +18,6 @@ typedef union {
   uint32_t rgb;
 } led_t;
 
-/*
-    Function Signatures
-*/
 void setAllKeysColor(led_t *ledColors, uint32_t color);
 void setModKeysColor(led_t *ledColors, uint32_t color);
 void setKeyColor(led_t *key, uint32_t color);

@@ -1,4 +1,12 @@
 #include "light_utils.h"
+#include "matrix.h"
+#include "settings.h"
+
+/* Update ticks based on profile settings */
+static inline void updateAnimationSpeed(void) {
+  animationSkipTicks = profiles[currentProfile].animationSpeed[currentSpeed];
+  animationTicks = 0;
+}
 
 /*
  * STATIC

@@ -7,7 +7,10 @@
 
 /* LED Matrix state */
 led_t ledColors[KEY_COUNT];
+led_t ledMask[KEY_COUNT];
+
 bool needToCallbackProfile = false;
+bool matrixEnabled;
 
 /* Animations */
 /* If non-zero the animation is enabled; 1 is full speed */
@@ -15,13 +18,6 @@ volatile uint16_t animationSkipTicks = 0;
 
 /* Animation tick counter used to slow down animations */
 uint16_t animationTicks = 0;
-
-/* Forced colors by main chip */
-// Flag to check if there is a foreground color currently active
-bool foregroundColorSet = false;
-uint32_t foregroundColor = 0;
-
-uint8_t ledMasks[KEY_COUNT];
 
 /* Internal function prototypes */
 static void animationCallback(void);
@@ -121,7 +117,13 @@ static inline void pwmNextColumn() {
   rowsEnabled = 0;
   for (size_t keyRow = 0; keyRow < NUM_ROW; keyRow++) {
     const uint8_t ledIndex = ROWCOL2IDX(keyRow, currentColumn);
-    const led_t cl = ledColors[ledIndex];
+    led_t cl;
+    /* TODO: Maybe... weight with alpha? */
+    if (ledMask[ledIndex].p.alpha) {
+      cl = ledMask[ledIndex];
+    } else {
+      cl = ledColors[ledIndex];
+    }
 
     for (size_t colorIdx = 0; colorIdx < 3; colorIdx++) {
       const uint8_t ledRow = 3 * keyRow + colorIdx;
@@ -147,11 +149,6 @@ static inline void pwmNextColumn() {
  * Update lighting table as per animation
  */
 static inline void animationCallback() {
-  // If the foreground is set we skip the animation as a way to avoid it
-  // overrides the foreground
-  if (foregroundColorSet) {
-    return;
-  }
   profiles[currentProfile].callback(ledColors);
 }
 
@@ -218,6 +215,7 @@ void matrixDisable() {
   for (int i = 0; i < NUM_COLUMN; i++) {
     palClearLine(ledColumns[i]);
   }
+  matrixEnabled = false;
   chMtxUnlock(&mtx);
 }
 
@@ -233,8 +231,12 @@ void matrixEnable(void) {
   gptStart(&GPTD_BFTM0, &bftm0Config);
   gptStartContinuous(&GPTD_BFTM0, 1);
 
+  matrixEnabled = true;
   chMtxUnlock(&mtx);
 }
 
 /* Initialize matrix module */
-void matrixInit() { chMtxObjectInit(&mtx); }
+void matrixInit() {
+  chMtxObjectInit(&mtx);
+  matrixEnabled = false;
+}
