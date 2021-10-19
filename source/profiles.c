@@ -1,7 +1,6 @@
 #include "profiles.h"
 #include "matrix.h"
 #include "miniFastLED.h"
-#include "string.h"
 
 // An array of basic colors used accross different lighting profiles
 // static const uint32_t colorPalette[] = {0xFF0000, 0xF0F00, 0x00F00, 0x00F0F,
@@ -202,7 +201,7 @@ void reactiveFadeInit(led_t *ledColors) {
       animatedPressedBuf[i * NUM_COLUMN + j] = i * 15 + 25;
     }
   }
-  memset(ledColors, 0, NUM_ROW * NUM_COLUMN * sizeof(*ledColors));
+  setAllKeysToBlank(ledColors);
 }
 
 uint8_t pulseBuf[NUM_ROW];
@@ -242,7 +241,7 @@ void reactivePulseInit(led_t *ledColors) {
   for (int i = 0; i < NUM_ROW; i++) {
     pulseBuf[i] = 80 + i * 5;
   }
-  memset(ledColors, 0, NUM_ROW * NUM_COLUMN * 3);
+  setAllKeysToBlank(ledColors);
 }
 
 /*
@@ -265,7 +264,7 @@ uint16_t termAnim;
 void reactiveTerm(led_t *ledColors) {
   led_t color;
   color.rgb = 0;
-  memset(ledColors, 0, NUM_COLUMN * NUM_ROW * sizeof(*ledColors));
+  setAllKeysToBlank(ledColors);
 
   if (termPos < 0) {
     color.p.red = 255;
@@ -320,11 +319,11 @@ void reactiveTermKeypress(led_t *ledColors, uint8_t row, uint8_t col) {
   }
   termAnim = 0;
   rowBlink = row;
-  memset(ledColors, 0, NUM_COLUMN * NUM_ROW * sizeof(*ledColors));
+  setAllKeysToBlank(ledColors);
 }
 
 void reactiveTermInit(led_t *ledColors) {
   termPos = 0;
   termAnim = 0;
-  memset(ledColors, 0, NUM_COLUMN * NUM_ROW * sizeof(*ledColors));
+  setAllKeysToBlank(ledColors);
 }
