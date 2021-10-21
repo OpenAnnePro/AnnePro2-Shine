@@ -41,4 +41,8 @@ extern volatile uint8_t currentSpeed;
 /* 0 - 7: Zero corresponds to the full intensity. */
 extern uint8_t ledIntensity;
 
+/* Use this to color correct your RGB lights. */
+extern led_t color_correction;
+extern led_t color_temperature;
+
 #endif
