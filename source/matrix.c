@@ -130,17 +130,17 @@ static inline void pwmNextColumn() {
 
       /* Compute adjustments */
       uint8_t color = cl.pv[2 - colorIdx];
-      
+
       uint8_t cc = color_correction.pv[2 - colorIdx];
       uint8_t ct = color_temperature.pv[2 - colorIdx];
-      
-      if(cc > 0 && ct > 0) {
-          uint32_t work = (((uint32_t)cc)+1) * (((uint32_t)ct)+1) * 0xFF;
-          work /= 0x10000L;
-          uint8_t adj = work & 0xFF;
-          color = (color * adj) / 0xFF;
+
+      if (cc > 0 && ct > 0) {
+        uint32_t work = (((uint32_t)cc) + 1) * (((uint32_t)ct) + 1) * 0xFF;
+        work /= 0x10000L;
+        uint8_t adj = work & 0xFF;
+        color = (color * adj) / 0xFF;
       }
-      
+
       /* >>2 to decrease the color resolution from 0-255 to 0-63 */
       color = color >> 2;
       if (color > 0) {
