@@ -18,8 +18,10 @@ typedef union {
   uint32_t rgb;
 } led_t;
 
+void setAllKeysToBlank(led_t *ledColors);
 void setAllKeysColor(led_t *ledColors, uint32_t color);
 void setModKeysColor(led_t *ledColors, uint32_t color);
+void setLetterKeysColor(led_t *ledColors, uint32_t color);
 void setKeyColor(led_t *key, uint32_t color);
 
 #endif
