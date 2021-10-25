@@ -127,8 +127,22 @@ static inline void pwmNextColumn() {
 
     for (size_t colorIdx = 0; colorIdx < 3; colorIdx++) {
       const uint8_t ledRow = 3 * keyRow + colorIdx;
+
+      /* Compute adjustments */
+      uint8_t color = cl.pv[2 - colorIdx];
+
+      uint8_t cc = color_correction.pv[2 - colorIdx];
+      uint8_t ct = color_temperature.pv[2 - colorIdx];
+
+      if (cc > 0 && ct > 0) {
+        uint32_t work = (((uint32_t)cc) + 1) * (((uint32_t)ct) + 1) * 0xFF;
+        work /= 0x10000L;
+        uint8_t adj = work & 0xFF;
+        color = (color * adj) / 0xFF;
+      }
+
       /* >>2 to decrease the color resolution from 0-255 to 0-63 */
-      uint8_t color = cl.pv[2 - colorIdx] >> 2;
+      color = color >> 2;
       if (color > 0) {
         /* Each led is enabled for color>0 even for a short while. */
         palSetLine(ledRows[ledRow]);
