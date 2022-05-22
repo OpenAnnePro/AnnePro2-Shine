@@ -211,6 +211,74 @@ static inline void setColorMono(const message_t *msg) {
   setLedMono(ledColors, msg);
 }
 
+static inline void handleStickyEnabled(void) {
+  stickyKeysExist = 1;
+  if (!matrixEnabled) {
+    matrixEnable();
+    sendStatus();
+    // we changed backlightDisabled by calling matrixEnable
+    // we must set it to 1 as the user wants backlight
+    // to be off
+    backlightDisabled = 1;
+  }
+}
+
+static inline void setStickyKey(const message_t *msg) {
+  setLedKey(ledSticky, msg);
+  handleStickyEnabled();
+}
+
+static inline void setStickyRow(const message_t *msg) {
+  setLedRow(ledSticky, msg);
+  handleStickyEnabled();
+}
+
+static inline void setStickyMono(const message_t *msg) {
+  setLedMono(ledSticky, msg);
+  handleStickyEnabled();
+}
+
+static inline void checkStickyExists(void) {
+  // extra var because we probably want to
+  // change global vars only in atomic operations
+  uint8_t exists = 0;
+  for (uint8_t i = 0; i < KEY_COUNT; i++) {
+    if (ledSticky[i].p.alpha) {
+      exists = 1;
+      break;
+    }
+  }
+  stickyKeysExist = exists;
+  if (!stickyKeysExist && backlightDisabled && matrixEnabled) {
+    // matrix was enabled by sticky keys but disabled
+    // by user, we should disable it again
+    matrixDisable();
+    sendStatus();
+  }
+}
+
+static inline void unsetStickyKey(const message_t *msg) {
+  uint8_t row = msg->payload[0];
+  uint8_t col = msg->payload[1];
+  ledSticky[ROWCOL2IDX(row, col)].p.alpha = 0;
+  checkStickyExists();
+}
+
+static inline void unsetStickyRow(const message_t *msg) {
+  uint8_t row = msg->payload[0];
+  for (uint8_t i = 0; i < NUM_COLUMN; i++) {
+    ledSticky[ROWCOL2IDX(row, i)].p.alpha = 0;
+  }
+  checkStickyExists();
+}
+
+static inline void unsetStickyAll(void) {
+  for (uint8_t i = 0; i < KEY_COUNT; i++) {
+    ledSticky[i].p.alpha = 0;
+  }
+  checkStickyExists();
+}
+
 /*
  * Execute action based on a message. This runs in a separate thread than LED
  * refreshing algorithm. Keep it simple, fast, mark something in a variable
@@ -284,6 +352,26 @@ void commandCallback(const message_t *msg) {
     break;
   case CMD_LED_COLOR_SET_MONO:
     setColorMono(msg);
+    break;
+
+  /* Handle sticky keys */
+  case CMD_LED_STICKY_SET_KEY:
+    setStickyKey(msg);
+    break;
+  case CMD_LED_STICKY_SET_ROW:
+    setStickyRow(msg);
+    break;
+  case CMD_LED_STICKY_SET_MONO:
+    setStickyMono(msg);
+    break;
+  case CMD_LED_STICKY_UNSET_KEY:
+    unsetStickyKey(msg);
+    break;
+  case CMD_LED_STICKY_UNSET_ROW:
+    unsetStickyRow(msg);
+    break;
+  case CMD_LED_STICKY_UNSET_ALL:
+    unsetStickyAll();
     break;
 
   default:

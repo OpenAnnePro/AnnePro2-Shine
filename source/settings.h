@@ -41,6 +41,10 @@ extern volatile uint8_t currentSpeed;
 /* Whether ledColors should be updated in mainCallback in matrix.c */
 extern uint8_t manualControl;
 
+/* Wheter we should disable keyboard after all sticky keys are unset */
+extern uint8_t backlightDisabled;
+extern uint8_t stickyKeysExist;
+
 /* 0 - 7: Zero corresponds to the full intensity. */
 extern uint8_t ledIntensity;
 
