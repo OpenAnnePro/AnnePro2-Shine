@@ -38,6 +38,9 @@ extern uint8_t currentProfile;
 extern const uint8_t amountOfProfiles;
 extern volatile uint8_t currentSpeed;
 
+/* Whether ledColors should be updated in mainCallback in matrix.c */
+extern uint8_t manualControl;
+
 /* 0 - 7: Zero corresponds to the full intensity. */
 extern uint8_t ledIntensity;
 

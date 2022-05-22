@@ -182,7 +182,7 @@ void mainCallback(GPTDriver *_driver) {
   }
 
   /* Update profile if required before starting new cycle */
-  if (needToCallbackProfile) {
+  if (!manualControl && needToCallbackProfile) {
     needToCallbackProfile = false;
     profiles[currentProfile].callback(ledColors);
   }
@@ -191,7 +191,7 @@ void mainCallback(GPTDriver *_driver) {
    * pwmCounterLimit=80 + 80kHz timer this refreshes at 80kHz/80/14 = 71Hz and
    * should be a sensible maximum speed for a fluent smooth animation.
    */
-  if (animationSkipTicks > 0 && currentColumn == 13) {
+  if (!manualControl && animationSkipTicks > 0 && currentColumn == 13) {
     animationTicks++;
     if (animationTicks >= animationSkipTicks) {
       animationTicks = 0;
