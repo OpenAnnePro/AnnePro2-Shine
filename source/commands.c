@@ -4,6 +4,7 @@
 #include "miniFastLED.h"
 #include "profiles.h"
 #include "protocol.h"
+#include "settings.h"
 #include <string.h>
 
 /*
@@ -88,7 +89,7 @@ static inline void setProfile(uint8_t profile) {
  */
 
 /* Override one key with a given color */
-static inline void setMaskKey(const message_t *msg) {
+static inline void setLedKey(led_t *ledArray, const message_t *msg) {
   uint8_t row = msg->payload[0];
   uint8_t col = msg->payload[1];
   led_t color = {.p.blue = msg->payload[2],
@@ -97,11 +98,11 @@ static inline void setMaskKey(const message_t *msg) {
                  .p.alpha = msg->payload[5]};
   naiveDimLed(&color);
   if (row < NUM_ROW && col <= NUM_COLUMN)
-    setKeyColor(&ledMask[ROWCOL2IDX(row, col)], color.rgb);
+    setKeyColor(&ledArray[ROWCOL2IDX(row, col)], color.rgb);
 }
 
 /* Override all keys with given color */
-static inline void setMaskRow(const message_t *msg) {
+static inline void setLedRow(led_t *ledArray, const message_t *msg) {
   uint8_t row = msg->payload[0];
   if (row > NUM_ROW)
     return;
@@ -116,19 +117,19 @@ static inline void setMaskRow(const message_t *msg) {
     color.p.alpha = *(payloadPtr++);
 
     naiveDimLed(&color);
-    ledMask[ROWCOL2IDX(row, col)] = color;
+    setKeyColor(&ledArray[ROWCOL2IDX(row, col)], color.rgb);
   }
 }
 
 /* Override all keys with given color */
-static inline void setMaskMono(const message_t *msg) {
+static inline void setLedMono(led_t *ledArray, const message_t *msg) {
   led_t color = {.p.red = msg->payload[2],
                  .p.green = msg->payload[1],
                  .p.blue = msg->payload[0],
                  .p.alpha = msg->payload[3]};
 
   naiveDimLed(&color);
-  setAllKeysColor(ledMask, color.rgb);
+  setAllKeysColor(ledArray, color.rgb);
 }
 
 /* Thread status */
@@ -184,6 +185,30 @@ static inline void blinkKey(const message_t *msg) {
 
   blinker.thread = chThdCreateFromHeap(NULL, THD_WORKING_AREA_SIZE(32),
                                        "blinker", NORMALPRIO, blinkerFun, NULL);
+}
+
+static inline void setManual(const message_t *msg) {
+  manualControl = msg->payload[0];
+}
+
+static inline void setMaskKey(const message_t *msg) { setLedKey(ledMask, msg); }
+
+static inline void setMaskRow(const message_t *msg) { setLedRow(ledMask, msg); }
+
+static inline void setMaskMono(const message_t *msg) {
+  setLedMono(ledMask, msg);
+}
+
+static inline void setColorKey(const message_t *msg) {
+  setLedKey(ledColors, msg);
+}
+
+static inline void setColorRow(const message_t *msg) {
+  setLedRow(ledColors, msg);
+}
+
+static inline void setColorMono(const message_t *msg) {
+  setLedMono(ledColors, msg);
 }
 
 /*
@@ -245,6 +270,20 @@ void commandCallback(const message_t *msg) {
     break;
   case CMD_LED_KEY_BLINK:
     blinkKey(msg);
+    break;
+
+  /* Handle manual color control */
+  case CMD_LED_SET_MANUAL:
+    setManual(msg);
+    break;
+  case CMD_LED_COLOR_SET_KEY:
+    setColorKey(msg);
+    break;
+  case CMD_LED_COLOR_SET_ROW:
+    setColorRow(msg);
+    break;
+  case CMD_LED_COLOR_SET_MONO:
+    setColorMono(msg);
     break;
 
   default:
