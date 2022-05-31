@@ -8,6 +8,9 @@
 /* LED Matrix state */
 led_t ledColors[KEY_COUNT];
 led_t ledMask[KEY_COUNT];
+led_t ledSticky[KEY_COUNT];
+
+led_t noColor = {.p.red = 0, .p.green = 0, .p.blue = 0, .p.alpha = 0};
 
 bool needToCallbackProfile = false;
 bool matrixEnabled;
@@ -119,10 +122,17 @@ static inline void pwmNextColumn() {
     const uint8_t ledIndex = ROWCOL2IDX(keyRow, currentColumn);
     led_t cl;
     /* TODO: Maybe... weight with alpha? */
-    if (ledMask[ledIndex].p.alpha) {
+    if (ledSticky[ledIndex].p.alpha) {
+      cl = ledSticky[ledIndex];
+    } else if (ledMask[ledIndex].p.alpha && !backlightDisabled) {
       cl = ledMask[ledIndex];
-    } else {
+    } else if (!backlightDisabled) {
       cl = ledColors[ledIndex];
+    } else {
+      // user disabled backlight, but sticky keys are keeping
+      // it alive, unless a sticky key exists, led should
+      // be turned off
+      cl = noColor;
     }
 
     for (size_t colorIdx = 0; colorIdx < 3; colorIdx++) {
@@ -209,6 +219,10 @@ void mainCallback(GPTDriver *_driver) {
  * Turn off LEDs and PWM interrupt.
  */
 void matrixDisable() {
+  backlightDisabled = 1;
+  if (stickyKeysExist) {
+    return;
+  }
 
   chMtxLock(&mtx);
 
@@ -237,6 +251,7 @@ void matrixDisable() {
  * Turn on LED power and start PWM interrupt.
  */
 void matrixEnable(void) {
+  backlightDisabled = 0;
   chMtxLock(&mtx);
 
   palSetLine(LINE_LED_PWR);
