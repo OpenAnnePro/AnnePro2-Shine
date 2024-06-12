@@ -14,7 +14,9 @@
  * keys should be sent to LED controller.
  */
 static inline void sendStatus(void) {
-  uint8_t isReactive = profiles[currentProfile].keypressCallback != NULL;
+  uint8_t isReactive = profiles[currentProfile].keypressCallback != NULL &&
+    !manualControl &&
+    !backlightDisabled;
 
   uint8_t payload[] = {
       amountOfProfiles, currentProfile, matrixEnabled,
@@ -343,6 +345,7 @@ void commandCallback(const message_t *msg) {
   /* Handle manual color control */
   case CMD_LED_SET_MANUAL:
     setManual(msg);
+    sendStatus();
     break;
   case CMD_LED_COLOR_SET_KEY:
     setColorKey(msg);
