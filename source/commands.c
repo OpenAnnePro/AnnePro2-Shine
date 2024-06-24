@@ -99,14 +99,14 @@ static inline void setLedKey(led_t *ledArray, const message_t *msg) {
                  .p.red = msg->payload[4],
                  .p.alpha = msg->payload[5]};
   naiveDimLed(&color);
-  if (row < NUM_ROW && col <= NUM_COLUMN)
+  if (row < NUM_ROW && col < NUM_COLUMN)
     setKeyColor(&ledArray[ROWCOL2IDX(row, col)], color.rgb);
 }
 
 /* Override all keys with given color */
 static inline void setLedRow(led_t *ledArray, const message_t *msg) {
   uint8_t row = msg->payload[0];
-  if (row > NUM_ROW)
+  if (row >= NUM_ROW)
     return;
 
   const uint8_t *payloadPtr = &msg->payload[1];
@@ -262,12 +262,20 @@ static inline void checkStickyExists(void) {
 static inline void unsetStickyKey(const message_t *msg) {
   uint8_t row = msg->payload[0];
   uint8_t col = msg->payload[1];
+
+  if (row >= NUM_ROW || col >= NUM_COLUMN)
+    return;
+
   ledSticky[ROWCOL2IDX(row, col)].p.alpha = 0;
   checkStickyExists();
 }
 
 static inline void unsetStickyRow(const message_t *msg) {
   uint8_t row = msg->payload[0];
+
+  if (row >= NUM_ROW)
+    return;
+
   for (uint8_t i = 0; i < NUM_COLUMN; i++) {
     ledSticky[ROWCOL2IDX(row, i)].p.alpha = 0;
   }
