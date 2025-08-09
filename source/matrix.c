@@ -135,6 +135,12 @@ static inline void pwmNextColumn() {
       cl = noColor;
     }
 
+    if (keyRow == 0) {
+        for (size_t i = 0; i < NUM_ROW * 3; i++) {  // clear rowTimes at start of each column
+            rowTimes[i] = 0;
+        }
+    }
+
     for (size_t colorIdx = 0; colorIdx < 3; colorIdx++) {
       const uint8_t ledRow = 3 * keyRow + colorIdx;
 
